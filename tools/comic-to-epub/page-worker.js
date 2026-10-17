@@ -3,8 +3,7 @@
  * Runs off the main thread. For each page image it:
  *   1. splits two-page spreads into separate pages (optional, right-to-left aware),
  *   2. finds speech bubbles / caption boxes and cleans up their lettering in place:
- *      foggy gray strokes become solid ink, the bubble paper becomes flat, and thin
- *      strokes are thickened slightly so they survive being shrunk to screen size.
+ *      foggy gray strokes become solid, crisp ink and the bubble paper becomes flat.
  * The artwork is never touched: only neutral, near-white bubble paper with text-like
  * marks on it is edited, and a page with no edits is passed back byte-for-byte.
  *
@@ -12,7 +11,7 @@
  */
 
 const WHITE_BG = 215;
-const CLEAN_GROW = 0.035; // stroke thickening, as a fraction of letter height
+const CLEAN_GROW = 0; // stroke thickening (fraction of letter height); 0.035 clogged letters like E and A
 
 self.onmessage = async (e) => {
   const { id, buf, split, rtl, clean, quality } = e.data;
@@ -238,7 +237,14 @@ function findBubbles(rgba, gray, W, H) {
     for (let i = 0; i < w * h; i++) bright[i] = small[i] > thr ? 1 : 0;
     const { lab, n, stats } = label(bright, w, h, false);
     for (let i = 1; i <= n; i++) {
-      const [x, y, bw, bh] = stats[i];
+      const [x, y, bw, bh, area] = stats[i];
+      if (area > 0.02 * page && (bw > 0.7 * w || bh > 0.5 * h || area > 0.1 * page)) {
+        // a bubble that runs into a panel border merges with the white gutter into one
+        // giant region: find its lettering from the inside instead
+        for (const cand of openRegions(lab, w, i, stats[i], h))
+          if (!found.some((f) => overlap(cand.box, f.box) > 0.5)) found.push(cand);
+        continue;
+      }
       if (bw < 12 || bh < 10 || bw > 0.7 * w || bh > 0.5 * h) continue;
       if ((x === 0) + (y === 0) + (x + bw === w) + (y + bh === h) >= 2) continue;
       const comp = new Uint8Array(bw * bh);
@@ -251,7 +257,7 @@ function findBubbles(rgba, gray, W, H) {
         if (filled[k]) { farea++; if (!comp[k]) { holes[k] = 1; hcount++; } }
       }
       if (!(0.0006 * page < farea && farea < 0.1 * page)) continue;
-      if (farea / (bw * bh) < 0.36) continue; // compact shapes (0.36 lets joined bubbles through)
+      if (farea / (bw * bh) < 0.30) continue; // compact shapes (0.30 lets joined and long-tailed bubbles through)
       const hf = hcount / farea;
       if (!(0.025 < hf && hf < 0.5)) continue;
       const hl = label(holes, bw, bh, true);
@@ -265,7 +271,7 @@ function findBubbles(rgba, gray, W, H) {
       }
       if (smallMarks < 5 || median(areas) > 0.02 * farea) continue;
       const box = [x, y, bw, bh];
-      if (found.some((f) => overlap(box, f.box) > 0.3)) continue;
+      if (found.some((f) => overlap(box, f.box) > 0.5)) continue;
       found.push({ box, filled });
     }
   }
@@ -305,10 +311,85 @@ function findBubbles(rgba, gray, W, H) {
   return out;
 }
 
+/* Lettering inside a large white region (bubbles merged with the page gutter). Letters are small
+ * dark holes in the white; groups of them in lines are text. For each group, the "bubble" is the
+ * white paper (plus the letters) within a margin around the text. Coordinates: half scale. */
+function openRegions(lab, w, i, st, pageH) {
+  const [x, y, bw, bh] = st;
+  const comp = new Uint8Array(bw * bh);
+  for (let yy = 0; yy < bh; yy++)
+    for (let xx = 0; xx < bw; xx++) comp[yy * bw + xx] = lab[(y + yy) * w + x + xx] === i ? 1 : 0;
+  const filled = fillHoles(comp, bw, bh);
+  const holes = new Uint8Array(bw * bh);
+  for (let k = 0; k < bw * bh; k++) holes[k] = filled[k] && !comp[k] ? 1 : 0;
+  const hl = label(holes, bw, bh, true);
+  if (!hl.n) return [];
+  const isLetter = new Uint8Array(hl.n + 1), isSmall = new Uint8Array(hl.n + 1);
+  const lhs = [];
+  for (let j = 1; j <= hl.n; j++) {
+    const [, , ww, hh, ar] = hl.stats[j];
+    if (hh >= 0.004 * pageH && hh <= 0.016 * pageH && ww <= 3 * hh && ar >= 6) { isLetter[j] = 1; lhs.push(hh); }
+    if (hh <= 0.02 * pageH && ww <= 0.05 * bw + 3 * hh) isSmall[j] = 1; // letters, dots, counters
+  }
+  if (lhs.length < 5) return [];
+  const lh = median(lhs);
+  const letters = new Uint8Array(bw * bh), paper = new Uint8Array(bw * bh);
+  for (let k = 0; k < bw * bh; k++) {
+    letters[k] = isLetter[hl.lab[k]] ? 1 : 0;
+    paper[k] = comp[k] || isSmall[hl.lab[k]] ? 1 : 0;
+  }
+  const k2 = Math.max(3, Math.floor(lh * 1.1)) / 2;
+  const grown = dilateEllipse(letters, bw, bh, k2, k2 * 1.5);
+  const gl = label(grown, bw, bh, true);
+  const out = [];
+  for (let j = 1; j <= gl.n; j++) {
+    const [cx, cy, cw, ch] = gl.stats[j];
+    if (cw < 3 * lh) continue;
+    // count separate letters inside this group
+    const sub = new Uint8Array(bw * bh);
+    for (let yy = cy; yy < cy + ch; yy++)
+      for (let xx = cx; xx < cx + cw; xx++) { const k = yy * bw + xx; if (letters[k] && gl.lab[k] === j) sub[k] = 1; }
+    if (label(sub, bw, bh, true).n < 5) continue;
+    // the text must sit on clear paper all round: anything else touching it (an image, a letter
+    // fused to artwork) means some lettering would be cut off or missed
+    const r = Math.max(3, Math.floor(lh * 1.2)) / 2;
+    const zone = dilateEllipse(sub, bw, bh, r, r);
+    let zn = 0, zp = 0;
+    for (let k = 0; k < bw * bh; k++) if (zone[k]) { zn++; zp += paper[k]; }
+    if (zp / zn < 0.97) continue;
+    const m = Math.floor(lh * 0.8);
+    out.push([Math.max(0, cx - m), Math.max(0, cy - m), Math.min(bw, cx + cw + m), Math.min(bh, cy + ch + m)]);
+  }
+  // one caption can come out as two overlapping groups (a wide gap between lines): merge them
+  // so the whole caption is treated the same way
+  for (let merged = true; merged;) {
+    merged = false;
+    outer: for (let a = 0; a < out.length; a++)
+      for (let c = a + 1; c < out.length; c++) {
+        const A = out[a], B = out[c];
+        if (A[0] < B[2] && B[0] < A[2] && A[1] < B[3] && B[1] < A[3]) {
+          out[a] = [Math.min(A[0], B[0]), Math.min(A[1], B[1]), Math.max(A[2], B[2]), Math.max(A[3], B[3])];
+          out.splice(c, 1); merged = true; break outer;
+        }
+      }
+  }
+  const res = [];
+  for (const [x0, y0, x1, y1] of out) {
+    const fw = x1 - x0, fh = y1 - y0, f = new Uint8Array(fw * fh);
+    let white = 0;
+    for (let yy = 0; yy < fh; yy++)
+      for (let xx = 0; xx < fw; xx++) { const v = paper[(y0 + yy) * bw + x0 + xx]; f[yy * fw + xx] = v; white += v; }
+    if (white / (fw * fh) < 0.4) continue; // mostly not white paper: not a lettering area
+    res.push({ box: [x + x0, y + y0, fw, fh], filled: f });
+  }
+  return res;
+}
+
 function overlap(a, b) {
   const ix = Math.max(0, Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0]));
   const iy = Math.max(0, Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]));
-  return (ix * iy) / Math.min(a[2] * a[3], b[2] * b[3]);
+  // relative to the union: a caption inside a larger pale area is its own candidate
+  return (ix * iy) / (a[2] * a[3] + b[2] * b[3] - ix * iy);
 }
 
 function measureText(b) {
@@ -362,9 +443,36 @@ function textBlocks(b) {
   return blocks;
 }
 
-function looksLikeText(blk, b) {
+function looksLikeText(blk, b, lh) {
   const { n } = label(blk.mask, b.w, b.h, true);
-  return n >= 4 && blk.box[2] - blk.box[0] >= 2 * b.letterH;
+  return n >= 4 && blk.box[2] - blk.box[0] >= 2 * lh;
+}
+
+/* Real bubbles leave paper between the lettering and the outline. Text that runs right up to
+ * the edge of its region (a sentence crossing a patch of an ad page) would be cut off. */
+function clearMargin(b, blk) {
+  const r = Math.max(3, Math.floor(blk.lh * 0.35)) + 0.5;
+  const zone = dilateEllipse(blk.mask, b.w, b.h, r, r);
+  let n = 0, inside = 0, stray = 0, marks = 0;
+  for (let k = 0; k < b.w * b.h; k++) {
+    if (blk.mask[k]) marks++;
+    if (!zone[k]) continue;
+    n++; inside += b.interior[k];
+    if (b.ink[k] && !blk.mask[k]) stray++; // other ink right next to it: a line split mid-sentence
+  }
+  // (the Python tool adds a stricter line-end test before re-lettering, where a cut-off line
+  // would print a wrong fragment; clean-up only darkens existing letters, so it isn't needed here)
+  return n > 0 && inside / n >= 0.97 && stray <= 0.02 * marks;
+}
+
+/* Typical letter height within one text block (ignores dots and quote marks). */
+function blockLetterH(blk, b) {
+  const { n, stats } = label(blk.mask, b.w, b.h, true);
+  if (!n) return 0;
+  const hts = stats.slice(1).map((s) => s[3]);
+  const p90 = percentile(hts, 90);
+  const big = hts.filter((v) => v >= 0.6 * p90);
+  return big.length ? median(big) : 0;
 }
 
 /* Real bubbles have flat paper behind the letters; bright patches of art don't. */
@@ -383,19 +491,24 @@ function cleanLettering(rgba, W, H) {
   const gray = toGray(rgba, W * H);
   let cleaned = 0;
   const lhMin = 0.0035 * H, lhMax = 0.013 * H;
+  const touched = new Uint8Array(W * H); // never clean a pixel twice (overlapping candidates)
   for (const b of findBubbles(rgba, gray, W, H)) {
-    if (!(b.letterH >= lhMin && b.letterH <= lhMax)) continue;
+    // letter size is checked per text block: one balloon can hold a big shout next to dialogue
+    if (!(b.letterH >= lhMin && b.letterH <= 3 * lhMax)) continue;
     const bgL = b.bg[0] * 0.299 + b.bg[1] * 0.587 + b.bg[2] * 0.114;
     // only neutral, near-white paper: tan skin or colored art with fine lines can look
     // like lettering, and the art must never be touched
     if (bgL < WHITE_BG || Math.max(...b.bg) - Math.min(...b.bg) >= 40) continue;
     if (!isLetteringArea(b, bgL)) continue;
-    const blocks = textBlocks(b).filter((blk) => looksLikeText(blk, b));
+    const blocks = [];
+    for (const blk of textBlocks(b)) {
+      blk.lh = blockLetterH(blk, b);
+      if (blk.lh >= lhMin && blk.lh <= lhMax && looksLikeText(blk, b, blk.lh) && clearMargin(b, blk)) blocks.push(blk);
+    }
     if (!blocks.length) continue;
-    const done = new Uint8Array(b.w * b.h);
     for (const blk of blocks) {
       const [x0, y0, x1, y1] = blk.box;
-      const pad = Math.floor(b.letterH * 0.6);
+      const pad = Math.floor(blk.lh * 0.6);
       // ink color: the darkest quarter of the lettering, made solid (same hue)
       const vals = [];
       for (let k = 0; k < b.w * b.h; k++) if (blk.mask[k]) vals.push(b.g[k]);
@@ -411,10 +524,10 @@ function cleanLettering(rgba, W, H) {
       const region = new Uint8Array(b.w * b.h);
       for (let y = Math.max(0, y0 - pad); y < Math.min(b.h, y1 + pad); y++)
         for (let x = Math.max(0, x0 - pad); x < Math.min(b.w, x1 + pad); x++) {
-          const k = y * b.w + x;
-          if (b.interior[k] && !done[k]) { region[k] = 1; done[k] = 1; }
+          const k = y * b.w + x, kp = (b.y + y) * W + b.x + x;
+          if (b.interior[k] && !touched[kp]) { region[k] = 1; touched[kp] = 1; }
         }
-      smoothstepInk(rgba, W, b, region, ink, Math.max(0, Math.round(b.letterH * CLEAN_GROW)));
+      smoothstepInk(rgba, W, b, region, ink, Math.max(0, Math.round(blk.lh * CLEAN_GROW)));
       cleaned++;
     }
   }
