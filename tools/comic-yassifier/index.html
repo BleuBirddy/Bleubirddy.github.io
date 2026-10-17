@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comic Yassifier for Xteink X3</title>
+<style>
+  :root{--bg:#f6f4ef;--ink:#16140f;--muted:#6b665c;--card:#fffdf8;--line:#d9d3c7;--accent:#2f5d50;--bad:#a33a2a}
+  @media (prefers-color-scheme:dark){:root{--bg:#15140f;--ink:#efeae0;--muted:#9c968a;--card:#1d1b16;--line:#36332b;--accent:#7fb8a4;--bad:#e07a68}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:640px;margin:0 auto;padding:40px 16px 64px}
+  h1{font-size:1.9rem;line-height:1.15;margin:0 0 6px;letter-spacing:-.01em}
+  .sub{color:var(--muted);margin:0 0 28px}
+  .styles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 16px}
+  .styles label{display:block;border:1.5px solid var(--line);border-radius:12px;background:var(--card);padding:12px 14px;cursor:pointer}
+  .styles input{position:absolute;opacity:0}
+  .styles b{display:block;font-size:.98rem}
+  .styles small{color:var(--muted);font-size:.84rem;line-height:1.35;display:block;margin-top:2px}
+  .styles label:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .styles label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+  #drop{display:block;border:2px dashed var(--line);border-radius:14px;background:var(--card);padding:44px 20px;text-align:center;cursor:pointer;transition:border-color .15s,transform .15s}
+  #drop:hover,#drop.over{border-color:var(--accent)}
+  #drop.over{transform:scale(1.01)}
+  #drop.busy{cursor:default;opacity:.7}
+  #drop strong{display:block;font-size:1.1rem;margin-bottom:4px}
+  #drop span{color:var(--muted);font-size:.92rem}
+  #status{margin:22px 0 8px;min-height:1.5em}
+  #status.err{color:var(--bad)}
+  .bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden}
+  .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s}
+  .meta{display:flex;justify-content:space-between;color:var(--muted);font-size:.88rem;margin-top:6px;font-variant-numeric:tabular-nums}
+  #done{display:none;margin-top:26px}
+  #dl{display:inline-block;background:var(--accent);color:var(--bg);text-decoration:none;font-weight:600;padding:12px 22px;border-radius:10px}
+  #viewer{display:none;margin-top:28px}
+  .vhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:10px}
+  .vhead strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #vcheck{font-size:.88rem;white-space:nowrap}
+  #vcheck.ok{color:var(--accent)} #vcheck.bad{color:var(--bad)}
+  #screen{display:block;width:100%;height:auto;margin:0 auto;border:1px solid var(--line);border-radius:6px;background:#fff;image-rendering:pixelated}
+  #screen.portrait{width:auto;max-width:100%;max-height:78vh}
+  .vnav{display:flex;align-items:center;gap:10px;margin-top:12px}
+  .vnav button{flex:none;width:44px;height:40px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font-size:1.3rem;cursor:pointer}
+  .vnav button:disabled{opacity:.35;cursor:default}
+  .vnav input[type=range]{flex:1;accent-color:var(--accent)}
+  #pnum{flex:none;min-width:5.5em;text-align:right;color:var(--muted);font-size:.88rem;font-variant-numeric:tabular-nums}
+  .vopts{margin-top:10px;color:var(--muted);font-size:.88rem}
+  #issues{margin:12px 0 0;padding-left:1.2em;font-size:.88rem}
+  #issues li.err{color:var(--bad)} #issues li.warn{color:var(--muted)}
+  .note{color:var(--muted);font-size:.85rem;margin-top:36px;border-top:1px solid var(--line);padding-top:16px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Comic Yassifier for the Xteink X3</h1>
+  <p class="sub">Drop a .cbz and get back a .xtch: bigger speech bubbles, smart page splits, crisp 4-shade e-ink output.</p>
+
+  <div class="styles" role="radiogroup" aria-label="Style">
+    <label><input type="radio" name="style" value="classic" checked><b>Classic</b><small>Full-contrast art, bubbles up to 1.6&times;</small></label>
+    <label><input type="radio" name="style" value="clear"><b>Light &amp; clear</b><small>Softer blacks, bubbles up to 1.7&times;, lettering stays bold</small></label>
+  </div>
+
+  <label id="drop">
+    <input id="file" type="file" accept=".cbz,.zip,.xtch" hidden>
+    <strong>Drop a CBZ here</strong>
+    <span>or click to choose a file &middot; drop an .xtch to just preview it</span>
+  </label>
+
+  <div id="status">Loading the converter…</div>
+  <div class="bar"><i id="fill"></i></div>
+  <div class="meta"><span id="count"></span><span id="time"></span></div>
+
+  <div id="done">
+    <a id="dl" download>Download .xtch</a>
+  </div>
+
+  <section id="viewer" aria-label="Screen previewer">
+    <div class="vhead"><strong id="vtitle"></strong><span id="vcheck"></span></div>
+    <canvas id="screen"></canvas>
+    <div class="vnav">
+      <button id="prev" aria-label="Previous screen">&lsaquo;</button>
+      <input id="scrub" type="range" min="0" value="0" aria-label="Screen">
+      <button id="next" aria-label="Next screen">&rsaquo;</button>
+      <span id="pnum"></span>
+    </div>
+    <label class="vopts"><input type="checkbox" id="asdevice"> Show as the device stores it (portrait)</label>
+    <ul id="issues"></ul>
+  </section>
+
+  <p class="note">Everything runs in your browser. Your comic is never uploaded anywhere.
+  The first visit downloads the conversion engine (tens of MB); after that it's cached.
+  Read the result on the X3 turned sideways (rotate clockwise).</p>
+</main>
+
+<script type="text/plain" id="core">
+"""
+xtch_core.py - browser-safe core of xteink_comics.py (bytes in -> bytes out).
+
+No subprocess, no multiprocessing, no filesystem: runs unchanged in Pyodide.
+API used by the web worker:
+    n = open_cbz(cbz_bytes, style)  # style "classic" or "clear"; returns page count
+    convert_page(i)                # converts page i, returns screens added
+    data = finish()                # returns the packed .xtch bytes
+"""
+from __future__ import annotations
+
+import io
+import re
+import struct
+import zipfile
+from pathlib import PurePosixPath
+
+import numpy as np
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+from scipy import ndimage
+
+SIZE = (528, 792)  # Xteink X3
+IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"}
+SKIP = re.compile(r"(?i)^z")  # scan-credit pages like zWater.jpg
+SHADES = [(0, 3), (85, 1), (170, 2), (255, 0)]  # CrossPoint: 0 white, 1 dark, 2 light, 3 black
+MAX_ENTRY = 80 * 1024 * 1024  # refuse absurd single images (zip-bomb guard)
+Image.MAX_IMAGE_PIXELS = 60_000_000
+
+
+def natural_key(name: str):
+    return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", name)]
+
+
+# --------------------------------------------------------------------- page tools
+
+def prep(img):
+    g = ImageOps.autocontrast(img.convert("L"), cutoff=0.5)
+    return ImageEnhance.Contrast(g).enhance(1.15)
+
+
+def _find_blobs(small, thr):
+    h, w = small.shape
+    lab, n = ndimage.label(small > thr)
+    out = []
+    if not n:
+        return out
+    page = h * w
+    for i, sl in enumerate(ndimage.find_objects(lab), start=1):
+        ys, xs = sl
+        if ys.stop - ys.start < 15 or xs.stop - xs.start < 15:
+            continue
+        if xs.stop - xs.start > 0.6 * w or ys.stop - ys.start > 0.3 * h:
+            continue
+        pad = 4
+        ys = slice(max(0, ys.start - pad), min(h, ys.stop + pad))
+        xs = slice(max(0, xs.start - pad), min(w, xs.stop + pad))
+        bh, bw = ys.stop - ys.start, xs.stop - xs.start
+        blob = lab[ys, xs] == i
+        filled = ndimage.binary_fill_holes(blob)
+        area = filled.sum()
+        if not (0.0008 * page < area < 0.08 * page) or area / (bh * bw) < 0.38:
+            continue
+        holes = filled & ~blob
+        if not (0.04 < holes.sum() / area < 0.45):
+            continue
+        hl, hn = ndimage.label(holes)
+        if hn < 8 or np.median(ndimage.sum(holes, hl, range(1, hn + 1))) > 0.01 * area:
+            continue
+        edges = (ys.start == 0) + (xs.start == 0) + (ys.stop == h) + (xs.stop == w)
+        if edges >= 2:
+            continue
+        sub = small[ys, xs]
+        ring = ndimage.binary_dilation(filled, iterations=2) & ~filled
+        if (sub[ring] < 110).mean() < 0.55 and abs(sub[ring].mean() - sub[filled & blob].mean()) < 70:
+            continue
+        out.append((xs.start, ys.start, ndimage.binary_dilation(filled, iterations=3)))
+    return out
+
+
+def _overlap(a, b):
+    ax, ay, am = a
+    bx, by, bm = b
+    ah, aw = am.shape
+    bh, bw = bm.shape
+    ix = max(0, min(ax + aw, bx + bw) - max(ax, bx))
+    iy = max(0, min(ay + ah, by + bh) - max(ay, by))
+    return ix * iy / min(aw * ah, bw * bh)
+
+
+def find_bubbles(g, ds=2):
+    small = np.array(g.resize((g.width // ds, g.height // ds))) if ds > 1 else np.array(g)
+    found = []
+    for thr in (220, 175):
+        for b in _find_blobs(small, thr):
+            if not any(_overlap(b, o) > 0.3 for o in found):
+                found.append(b)
+    return [(x * ds, y * ds, m) for x, y, m in found], ds
+
+
+def enlarge_bubbles(g, factor=1.4):
+    bubbles, ds = find_bubbles(g)
+    W, H = g.size
+    boxes = [(x, y, x + m.shape[1] * ds, y + m.shape[0] * ds) for x, y, m in bubbles]
+    gap, placed, plan = 3, [], []
+
+    def hits(b, others):
+        return any(b[0] < o[2] + gap and o[0] < b[2] + gap and b[1] < o[3] + gap and o[1] < b[3] + gap
+                   for o in others)
+
+    for i, (x0, y0, m) in enumerate(bubbles):
+        bw, bh = m.shape[1] * ds, m.shape[0] * ds
+        cx, cy = x0 + bw / 2, y0 + bh / 2
+        others = [b for j, b in enumerate(boxes) if j != i] + placed
+        f = min(factor, W / bw, H / bh)
+        spot = None
+        while f > 1.0 and spot is None:
+            nw, nh = int(bw * f), int(bh * f)
+            for ax, ay in ((cx - nw / 2, cy - nh / 2), (x0, y0), (x0 + bw - nw, y0), (x0, y0 + bh - nh),
+                           (x0 + bw - nw, y0 + bh - nh), (cx - nw / 2, y0), (cx - nw / 2, y0 + bh - nh)):
+                qx = int(min(max(ax, 0), W - nw))
+                qy = int(min(max(ay, 0), H - nh))
+                b = (qx, qy, qx + nw, qy + nh)
+                if not hits(b, others):
+                    spot = b
+                    break
+            if spot is None:
+                f -= 0.05
+        if spot is None:
+            continue
+        placed.append(spot)
+        plan.append((x0, y0, m, spot))
+
+    res = g.copy()
+    for x0, y0, m, (px, py, px2, py2) in plan:
+        mask = Image.fromarray((m * 255).astype(np.uint8)).resize((m.shape[1] * ds, m.shape[0] * ds), Image.NEAREST)
+        crop = g.crop((x0, y0, x0 + mask.width, y0 + mask.height))
+        size = (px2 - px, py2 - py)
+        res.paste(crop.resize(size, Image.LANCZOS), (px, py), mask.resize(size, Image.LANCZOS))
+    return res
+
+
+def _letter_mask(g, ds=2):
+    """Pixel mask (at 1/ds scale) of lettering inside any bright text region, slightly dilated."""
+    small = np.array(g.resize((g.width // ds, g.height // ds)))
+    h, w = small.shape
+    page = h * w
+    letters = np.zeros((h, w), bool)
+    for thr in (215, 170):
+        lab, n = ndimage.label(small > thr)
+        for i, (ys, xs) in enumerate(ndimage.find_objects(lab), start=1):
+            bh, bw = ys.stop - ys.start, xs.stop - xs.start
+            if bh < 10 or bw < 10 or bw > 0.7 * w or bh > 0.4 * h:
+                continue
+            blob = lab[ys, xs] == i
+            filled = ndimage.binary_fill_holes(blob)
+            if filled.sum() < 0.0004 * page:
+                continue
+            holes = filled & ~blob
+            hn = ndimage.label(holes)[1]
+            if hn < 4 or not (0.02 < holes.sum() / filled.sum() < 0.5):
+                continue
+            letters[ys, xs] |= holes
+    return ndimage.binary_dilation(letters, iterations=3)
+
+
+def enlarge_bubbles_clear(g, factor=1.7):
+    """Light & clear style: grow each bubble pixel-accurately; a grown bubble must fully cover
+    its original and may not cover any other lettering or any other grown bubble."""
+    bubbles, ds = find_bubbles(g)
+    W, H = g.size
+    sw, sh = W // ds, H // ds
+    letters = _letter_mask(g, ds)
+    taken = np.zeros((sh, sw), bool)
+    plan = []
+    for x0, y0, m in sorted(bubbles, key=lambda b: -b[2].sum()):
+        sx, sy = x0 // ds, y0 // ds
+        mh, mw = m.shape
+        mh, mw = min(mh, sh - sy), min(mw, sw - sx)
+        m = m[:mh, :mw]
+        own = np.zeros((sh, sw), bool)
+        own[sy:sy + mh, sx:sx + mw] = m
+        foreign = letters & ~ndimage.binary_dilation(own, iterations=2)
+        f = min(factor, sw / mw, sh / mh)
+        spot = None
+        while f > 1.04 and spot is None:
+            nw, nh = int(mw * f), int(mh * f)
+            big = np.array(Image.fromarray(m.astype(np.uint8) * 255).resize((nw, nh), Image.NEAREST)) > 127
+            cx, cy = sx + mw / 2, sy + mh / 2
+            for ax, ay in ((cx - nw / 2, cy - nh / 2), (sx, sy), (sx + mw - nw, sy), (sx, sy + mh - nh),
+                           (sx + mw - nw, sy + mh - nh), (cx - nw / 2, sy), (cx - nw / 2, sy + mh - nh),
+                           (sx, cy - nh / 2), (sx + mw - nw, cy - nh / 2)):
+                qx = int(min(max(ax, 0), sw - nw))
+                qy = int(min(max(ay, 0), sh - nh))
+                cand = np.zeros((sh, sw), bool)
+                cand[qy:qy + nh, qx:qx + nw] = big
+                if (cand & foreign).any() or (cand & taken).any():
+                    continue
+                if (own & ~cand).sum() > 0.01 * own.sum():
+                    continue
+                spot = (qx * ds, qy * ds, nw * ds, nh * ds)
+                taken |= cand
+                break
+            if spot is None:
+                f -= 0.05
+        if spot:
+            plan.append((x0, y0, m, spot))
+    res = g.copy()
+    for x0, y0, m, (px, py, nw, nh) in plan:
+        mask = Image.fromarray((m * 255).astype(np.uint8)).resize((m.shape[1] * ds, m.shape[0] * ds), Image.NEAREST)
+        crop = g.crop((x0, y0, x0 + mask.width, y0 + mask.height))
+        res.paste(crop.resize((nw, nh), Image.LANCZOS), (px, py), mask.resize((nw, nh), Image.LANCZOS))
+    return res
+
+
+def lighten_art(screen, amount):
+    """Compress the dark end so solid blacks become dark gray (softer e-ink refreshes)."""
+    if amount <= 0:
+        return screen
+    a = np.array(screen, dtype=float)
+    a = 255 - (255 - a) * (1 - amount)
+    return Image.fromarray(a.clip(0, 255).astype(np.uint8))
+
+
+# style -> (bubble grower, max factor, art lightening)
+STYLES = {"classic": (enlarge_bubbles, 1.6, 0.0), "clear": (enlarge_bubbles_clear, 1.7, 0.3)}
+
+
+def choose_cut(g):
+    DS = 4
+    small = np.array(g.resize((g.width // DS, g.height // DS)))
+    h, w = small.shape
+    covered = np.zeros(h)
+    spans = []
+    lab, n = ndimage.label(small > 225)
+    if n:
+        sizes = ndimage.sum(small > 225, lab, range(1, n + 1))
+        for i, (ys, xs) in enumerate(ndimage.find_objects(lab)):
+            bh, bw = ys.stop - ys.start, xs.stop - xs.start
+            if sizes[i] < 40 or bw > 0.6 * w or bh > 0.15 * h or sizes[i] / (bh * bw) < 0.35:
+                continue
+            if 0.03 < (small[ys, xs] < 90).mean() < 0.6:
+                covered[ys.start:ys.stop] += 1
+                spans.append((ys.start, ys.stop))
+    tex = (np.abs(np.diff(small.astype(int), axis=1)) > 70).mean(axis=1)
+    uniform = small.std(axis=1) < 12
+    score = covered * 10 + tex * 5 - uniform * 3
+    lo, hi = int(h * 0.36), int(h * 0.64)
+    idx = np.arange(lo, hi)
+    s = np.convolve(score[lo:hi] + np.abs(idx - h / 2) / h * 2, np.ones(5) / 5, mode="same")
+    c = int(idx[int(np.argmin(s))])
+    hit = [(a, b) for a, b in spans if a <= c < b]
+    cap = int(h * 0.10)
+    top_end = min(max([b for _, b in hit], default=c), c + cap)
+    bot_start = max(min([a for a, _ in hit], default=c), c - cap)
+    return c * DS, top_end * DS, bot_start * DS
+
+
+def fit(img, size, sideways):
+    W, H = size
+    if sideways:
+        img = img.rotate(-90, expand=True)
+    sc = min(W / img.width, H / img.height)
+    img = img.resize((max(1, int(img.width * sc)), max(1, int(img.height * sc))), Image.LANCZOS)
+    canvas = Image.new("L", (W, H), 255)
+    canvas.paste(img, ((W - img.width) // 2, (H - img.height) // 2))
+    return canvas
+
+
+def page_to_screens(im, size=SIZE, style="classic"):
+    grow, factor, _ = STYLES[style]
+    g = prep(im)
+    if g.width > g.height:
+        parts = [g.crop((0, 0, g.width // 2, g.height)), g.crop((g.width // 2, 0, g.width, g.height))]
+    else:
+        parts = [g]
+    screens = []
+    for part in parts:
+        part = grow(part, factor)
+        c, top_end, bot_start = choose_cut(part)
+        ov, pad = int(part.height * 0.01), 12
+        top = part.crop((0, 0, part.width, min(part.height, max(c + ov, top_end + pad))))
+        bot = part.crop((0, max(0, min(c - ov, bot_start - pad)), part.width, part.height))
+        screens += [fit(top, size, True), fit(bot, size, True)]
+    return screens
+
+
+# --------------------------------------------------------------------- rendering
+
+def _snap(a):
+    pv = np.zeros(a.shape, np.uint8)
+    pv[a < 212] = 2
+    pv[a < 128] = 1
+    pv[a < 48] = 3
+    return pv
+
+
+def render(screen, lighten=0.0):
+    art = lighten_art(screen, lighten)
+    pv = _snap(np.array(art.filter(ImageFilter.UnsharpMask(radius=1.0, percent=120, threshold=3)), int))
+    bubbles, _ = find_bubbles(screen, ds=1)
+    if bubbles:
+        mask = np.zeros(pv.shape, bool)
+        for x0, y0, m in bubbles:
+            h, w = m.shape
+            mask[y0:y0 + h, x0:x0 + w] |= m[: pv.shape[0] - y0, : pv.shape[1] - x0]
+        crisp = _snap(np.array(screen.filter(ImageFilter.UnsharpMask(radius=1.2, percent=160, threshold=2)), int))
+        pv[mask] = crisp[mask]
+    return pv
+
+
+def encode_xth(pv):
+    h, w = pv.shape
+    col_bytes = (h + 7) // 8
+    padded = np.zeros((col_bytes * 8, w), np.uint8)
+    padded[:h] = pv
+    cols = padded[:, ::-1].T
+    data = np.packbits((cols >> 1) & 1, axis=1).tobytes() + np.packbits(cols & 1, axis=1).tobytes()
+    return struct.pack("<IHHBBI", 0x00485458, w, h, 0, 0, len(data)) + bytes(8) + data
+
+
+def pack_xtch(pages, size=SIZE):
+    W, H = size
+    table_off = 56
+    data_off = table_off + len(pages) * 16
+    out = io.BytesIO()
+    out.write(struct.pack("<IBBHBBBBIQQQQII", 0x48435458, 1, 0, len(pages), 0, 0, 0, 0, 0,
+                          0, table_off, data_off, 0, 0, 0))
+    off = data_off
+    for p in pages:
+        out.write(struct.pack("<QIHH", off, len(p), W, H))
+        off += len(p)
+    for p in pages:
+        out.write(p)
+    return out.getvalue()
+
+
+# --------------------------------------------------------------- streaming API
+
+_state = {"zip": None, "names": [], "blobs": [], "style": "classic"}
+
+
+def open_cbz(data, style="classic") -> int:
+    """Open a CBZ from bytes; returns page count. Raises ValueError on bad input."""
+    if style not in STYLES:
+        raise ValueError(f"Unknown style {style!r}")
+    if hasattr(data, "to_py"):
+        data = data.to_py()
+    buf = io.BytesIO(bytes(data))
+    if not zipfile.is_zipfile(buf):
+        raise ValueError("Not a CBZ/ZIP file. (CBR/RAR isn't supported yet.)")
+    z = zipfile.ZipFile(buf)
+    names = []
+    for info in z.infolist():
+        p = PurePosixPath(info.filename)
+        if info.is_dir() or p.suffix.lower() not in IMAGE_EXT:
+            continue
+        if p.name.startswith(".") or "__MACOSX" in p.parts or SKIP.search(p.name):
+            continue
+        if info.file_size > MAX_ENTRY:
+            continue
+        names.append(info.filename)
+    names.sort(key=lambda n: [natural_key(x) for x in PurePosixPath(n).parts])
+    if not names:
+        raise ValueError("No page images found inside that archive.")
+    _state.update(zip=z, names=names, blobs=[], style=style)
+    return len(names)
+
+
+def convert_page(i: int) -> int:
+    z = _state["zip"]
+    with z.open(_state["names"][i]) as f, Image.open(io.BytesIO(f.read())) as im:
+        im.load()
+        screens = page_to_screens(im, style=_state["style"])
+    lighten = STYLES[_state["style"]][2]
+    blobs = [encode_xth(render(s, lighten)) for s in screens]
+    _state["blobs"] += blobs
+    return len(blobs)
+
+
+def finish() -> bytes:
+    data = pack_xtch(_state["blobs"])
+    _state.update(zip=None, names=[], blobs=[])
+    return data
+
+</script>
+
+<script id="worker-src" type="text/plain">
+const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.27.2/full/";
+importScripts(PYODIDE + "pyodide.js");
+let py, ready;
+async function boot(core){
+  py = await loadPyodide({ indexURL: PYODIDE });
+  await py.loadPackage(["numpy", "scipy", "pillow"]);
+  py.runPython(core);
+}
+const clean = e => String(e && e.message || e).trim().split("\n").filter(Boolean).pop();
+onmessage = async ({ data }) => {
+  try {
+    if (data.type === "boot") { ready = boot(data.core); await ready; postMessage({ type: "ready" }); return; }
+    await ready;
+    const n = py.globals.get("open_cbz")(new Uint8Array(data.buffer), data.style);
+    postMessage({ type: "start", n });
+    const step = py.globals.get("convert_page");
+    for (let i = 0; i < n; i++) { step(i); postMessage({ type: "page", i: i + 1, n }); }
+    const out = py.globals.get("finish")().toJs();
+    postMessage({ type: "done", out }, [out.buffer]);
+  } catch (e) { postMessage({ type: "error", msg: clean(e) }); }
+};
+</script>
+
+<script>
+const $ = id => document.getElementById(id);
+const drop = $("drop"), input = $("file"), status = $("status"), fill = $("fill");
+let busy = false, ready = false, t0 = 0, timer = 0, outName = "comic.xtch";
+
+const worker = new Worker(URL.createObjectURL(new Blob([$("worker-src").textContent], { type: "text/javascript" })));
+worker.postMessage({ type: "boot", core: $("core").textContent });
+
+const say = (msg, err) => { status.textContent = msg; status.classList.toggle("err", !!err); };
+const fmt = s => s < 60 ? s.toFixed(0) + "s" : Math.floor(s / 60) + "m " + String(Math.round(s % 60)).padStart(2, "0") + "s";
+
+worker.onmessage = ({ data }) => {
+  if (data.type === "ready") { ready = true; if (!busy) say("Ready. Drop a comic."); }
+  else if (data.type === "start") { say(`Yassifying ${data.n} pages…`); $("count").textContent = `0 / ${data.n}`; }
+  else if (data.type === "page") {
+    const el = (performance.now() - t0) / 1000;
+    fill.style.width = (100 * data.i / data.n) + "%";
+    $("count").textContent = `${data.i} / ${data.n} pages`;
+    $("time").textContent = data.i < data.n ? `~${fmt(el / data.i * (data.n - data.i))} left` : "";
+  }
+  else if (data.type === "done") {
+    clearInterval(timer);
+    const el = (performance.now() - t0) / 1000;
+    const blob = new Blob([data.out], { type: "application/octet-stream" });
+    const a = $("dl"); a.href = URL.createObjectURL(blob); a.download = outName;
+    a.textContent = `Download ${outName} (${(blob.size / 1048576).toFixed(1)} MB)`;
+    say(`Done in ${fmt(el)}.`); $("time").textContent = "";
+    $("done").style.display = "block"; openViewer(data.out, outName);
+    busy = false; drop.classList.remove("busy");
+  }
+  else if (data.type === "error") {
+    clearInterval(timer); say(data.msg || "Something went wrong.", true);
+    busy = false; drop.classList.remove("busy");
+  }
+};
+let engineFailed = false;
+worker.onerror = e => { engineFailed = true; say("The converter failed to load. Check your connection and reload. (Previewing .xtch files still works.)", true); };
+
+function start(file) {
+  if (busy || !file) return;  // busy = a conversion is running
+  if (/\.xtch$/i.test(file.name)) {
+    $("done").style.display = "none"; fill.style.width = "0"; $("count").textContent = ""; $("time").textContent = "";
+    file.arrayBuffer().then(buf => { say(`Previewing ${file.name}.`); openViewer(new Uint8Array(buf), file.name); });
+    return;
+  }
+  if (!/\.(cbz|zip)$/i.test(file.name)) { say("That's not a .cbz or .xtch. (CBR/RAR isn't supported yet.)", true); return; }
+  if (!ready) { say(engineFailed ? "The converter couldn't load, so conversion is unavailable. Reload to try again." : "The converter is still loading. Try again in a moment.", true); return; }
+  busy = true; drop.classList.add("busy"); $("done").style.display = "none"; $("viewer").style.display = "none";
+  fill.style.width = "0"; $("count").textContent = ""; $("time").textContent = "";
+  const clear = document.querySelector("input[name=style]:checked").value === "clear";
+  outName = (file.name.replace(/\.[^.]+$/, "").replace(/[^\w\-. ]+/g, "").trim() || "comic") + (clear ? "-clear" : "") + ".xtch";
+  say("Reading file…"); t0 = performance.now();
+  file.arrayBuffer().then(buf => worker.postMessage({ type: "convert", buffer: buf, style: document.querySelector('input[name=style]:checked').value }, [buf]));
+}
+
+input.onchange = () => { start(input.files[0]); input.value = ""; };
+drop.addEventListener("click", e => { if (busy) e.preventDefault(); });
+["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); if (!busy) drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => start(e.dataTransfer.files[0]));
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => e.preventDefault());
+
+// XTCH validator + decoder, mirroring how CrossPoint reads the file.
+// Pure functions: no DOM, so they can be tested in Node.
+const XTCH_MAGIC = 0x48435458, XTC_MAGIC = 0x00435458, XTH_MAGIC = 0x00485458;
+const DEVICE_SIZES = { "528x792": "Xteink X3", "480x800": "Xteink X4" };
+
+function validateXtch(bytes) {
+  const errors = [], warnings = [], pages = [];
+  const len = bytes.byteLength;
+  if (len < 56) return { errors: ["File is too small to be an XTCH file."], warnings, pages };
+  const v = new DataView(bytes.buffer, bytes.byteOffset, len);
+  const magic = v.getUint32(0, true);
+  if (magic === XTC_MAGIC) return { errors: ["This is a 1-bit XTC file; the previewer only reads 2-bit XTCH."], warnings, pages };
+  if (magic !== XTCH_MAGIC) return { errors: ["Not an XTCH file (wrong magic number)."], warnings, pages };
+  if (v.getUint8(4) !== 1 || v.getUint8(5) !== 0) warnings.push(`Unexpected version ${v.getUint8(4)}.${v.getUint8(5)} (expected 1.0).`);
+  const count = v.getUint16(6, true);
+  const table = Number(v.getBigUint64(24, true));
+  if (count === 0) errors.push("The file says it has 0 pages.");
+  if (table + count * 16 > len) return { errors: [...errors, "Page table runs past the end of the file (truncated download?)."], warnings, pages };
+
+  const sizes = new Set();
+  let bad = 0;
+  for (let p = 0; p < count; p++) {
+    const e = table + p * 16;
+    const off = Number(v.getBigUint64(e, true)), size = v.getUint32(e + 8, true);
+    const w = v.getUint16(e + 12, true), h = v.getUint16(e + 14, true);
+    const fail = msg => { if (bad++ < 5) errors.push(`Screen ${p + 1}: ${msg}`); };
+    if (off + size > len || size < 22) { fail("data runs past the end of the file."); continue; }
+    if (v.getUint32(off, true) !== XTH_MAGIC) { fail("page header is corrupt."); continue; }
+    const pw = v.getUint16(off + 4, true), ph = v.getUint16(off + 6, true), dsize = v.getUint32(off + 10, true);
+    if (pw !== w || ph !== h) { fail(`size mismatch (table ${w}x${h}, page ${pw}x${ph}).`); continue; }
+    const expect = 2 * ((h + 7) >> 3) * w;
+    if (dsize !== expect || size !== 22 + expect) { fail("pixel data is the wrong length."); continue; }
+    sizes.add(`${w}x${h}`);
+    pages.push({ index: p, off, w, h });
+  }
+  if (bad > 5) errors.push(`…and ${bad - 5} more broken screens.`);
+  for (const s of sizes) if (!DEVICE_SIZES[s]) warnings.push(`Screens are ${s}, which doesn't match an Xteink X3 (528x792) or X4 (480x800).`);
+  if (sizes.size > 1) warnings.push("Screens have mixed sizes.");
+  return { errors, warnings, pages, count, device: sizes.size === 1 ? DEVICE_SIZES[[...sizes][0]] : null };
+}
+
+// Returns a Uint8Array of gray values (row-major, w*h) for one validated page.
+function decodeXth(bytes, page) {
+  const { off, w, h } = page, cb = (h + 7) >> 3;
+  const d1 = off + 22, d2 = d1 + cb * w, shade = [255, 85, 170, 0];
+  const out = new Uint8Array(w * h);
+  for (let x = 0; x < w; x++) {
+    const col = (w - 1 - x) * cb;  // column-major, rightmost column first
+    for (let y = 0; y < h; y++) {
+      const byte = col + (y >> 3), bit = 7 - (y & 7);
+      out[y * w + x] = shade[(((bytes[d1 + byte] >> bit) & 1) << 1) | ((bytes[d2 + byte] >> bit) & 1)];
+    }
+  }
+  return out;
+}
+
+
+// ---- previewer UI
+const vw = { bytes: null, pages: [], i: 0 };
+const screenEl = $("screen"), scrub = $("scrub"), asDevice = $("asdevice");
+const src = document.createElement("canvas");
+
+function openViewer(bytes, name) {
+  const r = validateXtch(bytes);
+  vw.bytes = bytes; vw.pages = r.pages; vw.i = 0;
+  $("vtitle").textContent = name;
+  const chk = $("vcheck");
+  if (r.errors.length) { chk.textContent = `✕ ${r.errors.length} problem${r.errors.length > 1 ? "s" : ""} found`; chk.className = "bad"; }
+  else { chk.textContent = `✓ ${r.count} screens · ${r.device || "unknown device"}`; chk.className = "ok"; }
+  $("issues").innerHTML = "";
+  for (const [list, cls] of [[r.errors, "err"], [r.warnings, "warn"]])
+    for (const m of list) { const li = document.createElement("li"); li.className = cls; li.textContent = m; $("issues").appendChild(li); }
+  const has = vw.pages.length > 0;
+  screenEl.style.display = has ? "block" : "none";
+  document.querySelector(".vnav").style.display = has ? "flex" : "none";
+  asDevice.parentElement.style.display = has ? "inline-block" : "none";
+  scrub.max = Math.max(0, vw.pages.length - 1);
+  $("viewer").style.display = "block";
+  if (has) show(0);
+}
+
+function show(i) {
+  vw.i = Math.max(0, Math.min(vw.pages.length - 1, i));
+  const p = vw.pages[vw.i], gray = decodeXth(vw.bytes, p);
+  src.width = p.w; src.height = p.h;
+  const sctx = src.getContext("2d"), img = sctx.createImageData(p.w, p.h);
+  for (let k = 0; k < gray.length; k++) { const j = k * 4; img.data[j] = img.data[j + 1] = img.data[j + 2] = gray[k]; img.data[j + 3] = 255; }
+  sctx.putImageData(img, 0, 0);
+  const ctx = screenEl.getContext("2d");
+  if (asDevice.checked) {           // raw portrait, exactly as stored
+    screenEl.width = p.w; screenEl.height = p.h; screenEl.classList.add("portrait");
+    ctx.drawImage(src, 0, 0);
+  } else {                          // undo the clockwise turn: how it reads with the X3 held sideways
+    screenEl.width = p.h; screenEl.height = p.w; screenEl.classList.remove("portrait");
+    ctx.save(); ctx.translate(0, p.w); ctx.rotate(-Math.PI / 2); ctx.drawImage(src, 0, 0); ctx.restore();
+  }
+  scrub.value = vw.i;
+  $("pnum").textContent = `${p.index + 1} / ${vw.pages.length}`;
+  $("prev").disabled = vw.i === 0; $("next").disabled = vw.i === vw.pages.length - 1;
+}
+
+$("prev").onclick = () => show(vw.i - 1);
+$("next").onclick = () => show(vw.i + 1);
+scrub.oninput = () => show(+scrub.value);
+asDevice.onchange = () => show(vw.i);
+document.addEventListener("keydown", e => {
+  if ($("viewer").style.display !== "block" || !vw.pages.length || e.target.matches("input[type=radio]")) return;
+  if (e.key === "ArrowRight" || e.key === "PageDown") { show(vw.i + 1); e.preventDefault(); }
+  if (e.key === "ArrowLeft" || e.key === "PageUp") { show(vw.i - 1); e.preventDefault(); }
+});
+</script>
+</body>
+</html>
