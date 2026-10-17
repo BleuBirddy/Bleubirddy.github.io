@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Comic to EPUB · Bleubirddy</title>
+  <meta name="description" content="Turn CBZ, CBR and PDF comics into EPUBs with clearer lettering. Runs entirely in your browser: your files never leave your device.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script src="lib/jszip/jszip.min.js"></script>
+  <script type="module" src="ui.js"></script>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <p class="eyebrow">Bleubirddy tools</p>
+      <h1>Comic to EPUB</h1>
+      <p class="lede">Turn <strong>CBZ</strong>, <strong>CBR</strong> and <strong>PDF</strong> comics into EPUBs for your phone,
+        tablet or e-reader, with foggy speech-bubble lettering cleaned up so it's easier to read.</p>
+    </header>
+
+    <section class="card">
+      <label class="drop" id="drop" tabindex="0">
+        <input type="file" id="file" accept=".cbz,.cbr,.zip,.rar,.pdf" multiple hidden>
+        <span class="drop-title">Drop comics here</span>
+        <span class="drop-sub">or <u>choose files</u> (.cbz, .cbr, .pdf)</span>
+      </label>
+
+      <fieldset class="opts">
+        <legend>Options</legend>
+        <label><input type="checkbox" id="clean" checked> Clean up lettering
+          <span class="hint">Sharper, darker text in speech bubbles. The artwork is never changed.</span></label>
+        <label><input type="checkbox" id="split" checked> Split two-page spreads
+          <span class="hint">Wide pages become two separate pages.</span></label>
+        <label><input type="checkbox" id="rtl"> Right-to-left (manga)
+          <span class="hint">Reading order and spread splitting go right to left.</span></label>
+        <label><input type="checkbox" id="maxq"> Maximum image quality
+          <span class="hint">Edited pages are saved almost losslessly. Files get about twice as big.</span></label>
+      </fieldset>
+
+      <ul class="jobs" id="jobs" aria-live="polite"></ul>
+    </section>
+
+    <section class="notes">
+      <h2>Private by design</h2>
+      <p>Everything happens in your browser. Your comics are never uploaded: this page has no server,
+        and it keeps working offline once loaded. Big issues can take a minute or two, especially on a phone.</p>
+      <h2>What the clean-up does</h2>
+      <p>It finds lettering on white speech bubbles and captions and redraws the ink solid on flat paper, slightly
+        thicker so it survives being shrunk to a small screen. Pages without changes are copied exactly as they were.
+        White-on-black captions, colored caption boxes and sound effects are left as drawn.</p>
+    </section>
+
+    <footer>
+      <p>Made by <a href="/">Bleubirddy</a>. Uses <a href="lib/jszip/LICENSE.markdown">JSZip</a>,
+        <a href="lib/libarchive/LICENSE">libarchive.js</a> and <a href="lib/pdfjs/LICENSE">pdf.js</a>.</p>
+    </footer>
+  </main>
+</body>
+</html>
