@@ -1,0 +1,947 @@
+<title>E-Reader Sleep Screen Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Atkinson+Hyperlegible+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: the device and its view controls on the left, settings on the right; stacks on phones. */
+:root {
+  --bg: #eef0f3;
+  --surface: #ffffff;
+  --ink: #1b1f26;
+  --muted: #5d6573;
+  --line: #d6dbe3;
+  --accent: #1f5fbf;
+  --accent-ink: #ffffff;
+  --bezel: #23272e;
+  --bezel-edge: #3a3f48;
+  --well: #e4e7ec;
+  --well-dot: #cdd2da;
+  --mat: #15181d;
+  --mat-ink: #e7eaef;
+  --mat-line: #343a44;
+  --paper-0: #000000; --paper-1: #555555; --paper-2: #aaaaaa; --paper-3: #ffffff;
+  --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Atkinson Hyperlegible Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151a; --surface: #1b1f26; --ink: #e7eaef; --muted: #9aa3b2; --line: #2d333d;
+    --accent: #6aa4ff; --accent-ink: #0b1220; --bezel: #0a0c0f; --bezel-edge: #2a2f37;
+    --well: #0e1115; --well-dot: #232831;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151a; --surface: #1b1f26; --ink: #e7eaef; --muted: #9aa3b2; --line: #2d333d;
+  --accent: #6aa4ff; --accent-ink: #0b1220; --bezel: #0a0c0f; --bezel-edge: #2a2f37;
+  --well: #0e1115; --well-dot: #232831;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.5;
+  padding-inline: 16px; padding-block: 28px 48px;
+}
+body.locked { overflow: hidden; }
+.wrap { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+header { display: flex; flex-direction: column; gap: 6px; max-width: 65ch; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-size: clamp(28px, 4vw, 38px); line-height: 1.1; margin: 0; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); }
+
+.main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 390px); gap: 28px; align-items: start; }
+@media (max-width: 840px) { .main { grid-template-columns: minmax(0, 1fr); } }
+
+/* Stage: view switcher, device, readouts */
+.stage { display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
+.viewbar { display: flex; gap: 8px; width: min(100%, 400px); align-items: stretch; }
+.viewbar .seg { flex: 1; }
+.device {
+  background: var(--bezel); border: 1px solid var(--bezel-edge);
+  border-radius: 22px; padding: 18px 18px 44px;
+  box-shadow: 0 18px 40px -22px rgba(0,0,0,.55);
+  width: min(100%, 360px); position: relative;
+}
+/* The area around the device where the off-screen part of the image shows while editing */
+.workspace { width: 100%; display: flex; justify-content: center; overflow: hidden; position: relative;
+  padding: 32px 16px; border-radius: var(--radius); background: var(--well);
+  background-image: radial-gradient(var(--well-dot) 1px, transparent 1.2px); background-size: 16px 16px; }
+.device::after {
+  content: ""; position: absolute; left: 50%; bottom: 16px; translate: -50% 0;
+  width: 44px; height: 6px; border-radius: 3px; background: var(--bezel-edge);
+}
+.device.tablet { border-radius: 14px; padding: 14px 14px 14px 30px; width: min(100%, 380px); }
+.device.tablet::after { left: 14px; top: 50%; bottom: auto; translate: 0 -50%; width: 4px; height: 40px; }
+.stage.dropping .device { outline: 3px dashed var(--accent); outline-offset: 6px; }
+
+.screen-wrap { position: relative; }
+.screen { position: relative; z-index: 2; display: block; width: 100%; height: auto; background: #fff; border-radius: 2px; }
+.screen.drafting { filter: grayscale(1); }
+.device.pixels .screen, .device.pixels .before { image-rendering: pixelated; }
+.ghost { position: absolute; z-index: 1; opacity: .38; pointer-events: none; max-width: none; }
+.before { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; border-radius: 2px; }
+
+.editor { position: absolute; inset: 0; z-index: 4; touch-action: none; outline: none; }
+.editor:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.box { position: absolute; cursor: move; touch-action: none;
+  outline: 1.5px solid var(--accent); box-shadow: 0 0 0 1px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.35); }
+.h { position: absolute; width: 12px; height: 12px; background: var(--surface); border: 2px solid var(--accent); border-radius: 3px; translate: -50% -50%; }
+.h::before { content: ""; position: absolute; inset: -10px; }
+.h[data-h="nw"] { left: 0; top: 0; cursor: nwse-resize; }   .h[data-h="se"] { left: 100%; top: 100%; cursor: nwse-resize; }
+.h[data-h="ne"] { left: 100%; top: 0; cursor: nesw-resize; } .h[data-h="sw"] { left: 0; top: 100%; cursor: nesw-resize; }
+.h[data-h="n"] { left: 50%; top: 0; cursor: ns-resize; border-radius: 6px; width: 18px; height: 8px; }
+.h[data-h="s"] { left: 50%; top: 100%; cursor: ns-resize; border-radius: 6px; width: 18px; height: 8px; }
+.h[data-h="w"] { left: 0; top: 50%; cursor: ew-resize; border-radius: 6px; width: 8px; height: 18px; }
+.h[data-h="e"] { left: 100%; top: 50%; cursor: ew-resize; border-radius: 6px; width: 8px; height: 18px; }
+.guide { position: absolute; background: var(--accent); pointer-events: none; }
+.guide.v { top: 0; bottom: 0; left: 50%; width: 1px; }
+.guide.hz { left: 0; right: 0; top: 50%; height: 1px; }
+.split { position: absolute; top: 0; bottom: 0; width: 2px; translate: -50% 0; background: var(--accent); pointer-events: none; }
+.split::after { content: "‹ ›"; position: absolute; top: 50%; left: 50%; translate: -50% -50%; background: var(--accent); color: var(--accent-ink);
+  font: 700 13px/1 var(--font-mono); padding: 7px 6px; border-radius: 999px; white-space: nowrap; }
+.cmp-label { position: absolute; top: 8px; font: 600 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+  background: rgba(0,0,0,.6); color: #fff; padding: 4px 6px; border-radius: 4px; pointer-events: none; }
+.cmp-label.l { left: 8px; } .cmp-label.r { right: 8px; }
+
+.stage:not([data-view="edit"]) .ghost, .stage:not([data-view="edit"]) .box, .stage:not([data-view="edit"]) .guide { display: none; }
+.stage:not([data-view="compare"]) .before, .stage:not([data-view="compare"]) .split, .stage:not([data-view="compare"]) .cmp-label { display: none; }
+.stage[data-view="preview"] .editor { pointer-events: none; }
+.stage[data-view="compare"] .editor { cursor: ew-resize; }
+
+.view-hint, .drop-hint { font-size: 14px; color: var(--muted); text-align: center; margin: 0; max-width: 46ch; }
+.shades { display: flex; gap: 6px; width: min(100%, 360px); }
+.shade { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.chip { height: 10px; border-radius: 3px; border: 1px solid var(--line); }
+.shade span { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Controls */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+legend, .label { font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 2px; }
+.sublabel { font-size: 14px; font-weight: 700; color: var(--ink); }
+.seg { display: flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg label { flex: 1 1 0; min-width: 70px; position: relative; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg span { display: block; text-align: center; padding: 8px 6px; font-size: 14px; cursor: pointer; border-right: 1px solid var(--line); }
+.seg label:last-child span { border-right: 0; }
+.seg input:checked + span { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -4px; }
+
+.chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(98px, 1fr)); gap: 6px; }
+.chips label { position: relative; }
+.chips input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.chips span { display: block; text-align: center; padding: 7px 6px; font-size: 14px; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; }
+.chips input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+.chips input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chips input:disabled + span { cursor: default; color: var(--muted); border-style: dashed; }
+.chips input:disabled:checked + span { color: var(--accent-ink); border-style: solid; }
+
+.swatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.swatches label { position: relative; }
+.swatches input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.swatches span { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); padding: 6px 2px; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; }
+.swatches i { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line); display: block; }
+.swatches input:checked + span { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); color: var(--ink); font-weight: 700; }
+.swatches input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.hint { font-size: 13px; color: var(--muted); margin: 0; }
+.range { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
+.range output { font-family: var(--font-mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 4ch; text-align: right; }
+.range input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+.checks { display: flex; flex-direction: column; gap: 6px; }
+.checks label { display: flex; gap: 8px; align-items: center; font-size: 15px; cursor: pointer; }
+.checks input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+button, .file-btn {
+  font: inherit; font-size: 15px; border-radius: 8px; padding: 10px 14px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+button.small { font-size: 14px; padding: 7px 11px; }
+button:hover, .file-btn:hover { border-color: var(--muted); }
+button:focus-visible, .file-btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; flex: 1; }
+.primary:hover { filter: brightness(1.08); border-color: var(--accent); }
+.file-btn { position: relative; overflow: hidden; display: inline-flex; align-items: center; }
+.file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+select { font: inherit; font-size: 15px; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
+select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="text"] { font-family: var(--font-mono); font-size: 14px; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
+.meta { font-family: var(--font-mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.status { font-size: 14px; min-height: 1.5em; color: var(--muted); margin: 0; }
+
+.howto { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; max-width: 100%; }
+.howto h2 { font-size: 18px; margin: 0 0 10px; }
+.howto ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; max-width: 70ch; }
+.howto .hint { margin-top: 12px; max-width: 70ch; }
+code { font-family: var(--font-mono); font-size: .92em; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+
+/* Full-screen viewer */
+.lightbox { position: fixed; inset: 0; z-index: 50; background: var(--mat); color: var(--mat-ink); display: flex; flex-direction: column; }
+.lb-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; border-bottom: 1px solid var(--mat-line); }
+.lb-bar .meta { color: var(--mat-ink); opacity: .8; }
+.lb-bar button { background: transparent; color: var(--mat-ink); border-color: var(--mat-line); }
+.lb-bar button:hover { border-color: var(--mat-ink); }
+.lb-bar button[aria-pressed="true"] { background: var(--mat-ink); color: var(--mat); }
+.lb-body { flex: 1; overflow: auto; display: flex; padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px)); min-height: 0; }
+.lb-body canvas { margin: auto; display: block; background: #fff; box-shadow: 0 0 0 10px #0a0c0f, 0 0 0 11px var(--mat-line); }
+.lb-body:not(.actual) canvas { max-width: calc(100% - 24px); max-height: calc(100% - 24px); width: auto; height: auto; }
+.lb-body.actual canvas { image-rendering: pixelated; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Xteink · Supernote · Kobo · Kindle</span>
+    <h1>Sleep Screen Maker</h1>
+    <p>Turn any image into a sleep screen for your e-reader. Drag and resize it right on the screen, check the result, and download a file in the exact format your device reads. Everything runs in your browser; your image never leaves your device.</p>
+  </header>
+
+  <div class="main">
+    <section class="stage" id="stage" data-view="edit" aria-label="Preview">
+      <div class="viewbar">
+        <div class="seg" role="radiogroup" aria-label="View">
+          <label><input type="radio" name="view" id="vw-edit" value="edit" checked><span>Edit</span></label>
+          <label><input type="radio" name="view" id="vw-preview" value="preview"><span>Preview</span></label>
+          <label><input type="radio" name="view" id="vw-compare" value="compare"><span>Compare</span></label>
+        </div>
+        <button type="button" class="small" id="fullBtn" title="Open a full-screen preview">Full screen</button>
+      </div>
+
+      <div class="workspace" id="workspace">
+      <div class="device" id="device">
+        <div class="screen-wrap" id="screenWrap">
+          <canvas class="screen" id="screen" width="528" height="792" aria-label="Sleep screen preview"></canvas>
+          <canvas class="before" id="before" width="528" height="792" aria-hidden="true"></canvas>
+          <div class="editor" id="editor" tabindex="0" aria-label="Image position. Arrow keys move, plus and minus zoom.">
+            <div class="box" id="box">
+              <span class="h" data-h="nw"></span><span class="h" data-h="n"></span><span class="h" data-h="ne"></span>
+              <span class="h" data-h="e"></span><span class="h" data-h="se"></span><span class="h" data-h="s"></span>
+              <span class="h" data-h="sw"></span><span class="h" data-h="w"></span>
+            </div>
+            <div class="guide v" id="guideV" hidden></div>
+            <div class="guide hz" id="guideH" hidden></div>
+            <div class="split" id="split" style="left:50%"></div>
+            <span class="cmp-label l">Original</span><span class="cmp-label r">On device</span>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <p class="view-hint" id="viewHint">Drag to move. Drag a corner to resize, or an edge to stretch. Scroll or pinch to zoom.</p>
+      <div class="shades" id="shades" aria-label="Shade usage"></div>
+      <p class="drop-hint" id="dropHint">Showing a sample image. Drop your own image anywhere on the page.</p>
+    </section>
+
+    <form class="panel" id="controls" autocomplete="off">
+      <div class="row">
+        <label class="file-btn">Choose image…<input type="file" id="file" accept="image/*"></label>
+        <button type="button" id="rotate" title="Rotate the image 90° clockwise">Rotate 90°</button>
+      </div>
+
+      <fieldset>
+        <label class="label" for="deviceSel">Device</label>
+        <select id="deviceSel"></select>
+      </fieldset>
+
+      <fieldset>
+        <legend>Fit</legend>
+        <div class="chips" role="radiogroup" aria-label="Fit">
+          <label><input type="radio" name="fit" id="fit-fill" value="fill" checked><span>Fill</span></label>
+          <label><input type="radio" name="fit" id="fit-fit" value="fit"><span>Fit</span></label>
+          <label><input type="radio" name="fit" id="fit-width" value="width"><span>Fit width</span></label>
+          <label><input type="radio" name="fit" id="fit-height" value="height"><span>Fit height</span></label>
+          <label><input type="radio" name="fit" id="fit-stretch" value="stretch"><span>Stretch</span></label>
+          <label><input type="radio" name="fit" id="fit-actual" value="actual"><span>Actual size</span></label>
+          <label><input type="radio" name="fit" id="fit-custom" value="custom" disabled><span>Custom</span></label>
+        </div>
+        <p class="hint" id="fitHint"></p>
+
+        <div class="range">
+          <label for="scale">Zoom</label><output id="scaleOut">100%</output>
+          <input type="range" id="scale" min="-2" max="3" step="0.01" value="0">
+        </div>
+        <div class="row" style="align-items:center;justify-content:space-between">
+          <span class="meta" id="placeOut"></span>
+          <div class="row">
+            <button type="button" class="small" id="centerBtn">Center</button>
+          </div>
+        </div>
+
+        <span class="sublabel">Background</span>
+        <div class="swatches" role="radiogroup" aria-label="Background shade">
+          <label><input type="radio" name="bg" id="bg-3" value="3" checked><span><i style="background:var(--paper-3)"></i>White</span></label>
+          <label><input type="radio" name="bg" id="bg-2" value="2"><span><i style="background:var(--paper-2)"></i>Light gray</span></label>
+          <label><input type="radio" name="bg" id="bg-1" value="1"><span><i style="background:var(--paper-1)"></i>Dark gray</span></label>
+          <label><input type="radio" name="bg" id="bg-0" value="0"><span><i style="background:var(--paper-0)"></i>Black</span></label>
+        </div>
+        <p class="hint">The background fills any part of the screen the image doesn't cover. These are the four shades an Xteink panel can show.</p>
+      </fieldset>
+
+      <fieldset id="renderSet">
+        <legend>Rendering</legend>
+        <div class="seg">
+          <label><input type="radio" name="render" id="rd-dither" value="dither" checked><span>Dithered</span></label>
+          <label><input type="radio" name="render" id="rd-clean" value="clean"><span>Clean shades</span></label>
+        </div>
+        <p class="hint">Dithered is best for photos and gradients. Clean shades is best for line art and lettering.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Tone</legend>
+        <div class="range">
+          <label for="brightness">Brightness</label><output id="brightnessOut">0</output>
+          <input type="range" id="brightness" min="-60" max="60" step="1" value="0">
+        </div>
+        <div class="range">
+          <label for="contrast">Contrast</label><output id="contrastOut">1.00×</output>
+          <input type="range" id="contrast" min="0.5" max="2" step="0.05" value="1">
+        </div>
+        <div class="checks">
+          <label><input type="checkbox" id="auto" checked> Auto levels</label>
+          <label><input type="checkbox" id="invert"> Invert</label>
+          <label><input type="checkbox" id="pixels"> Sharp pixels in preview</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <label class="label" for="filename">File name</label>
+        <input type="text" id="filename" value="sleep.bmp" spellcheck="false">
+        <span class="meta" id="meta">528×792 · 8-bit BMP · 418 KB</span>
+      </fieldset>
+
+      <div class="row">
+        <button type="submit" class="primary" id="download">Download BMP</button>
+        <button type="button" id="reset">Reset</button>
+      </div>
+      <p class="status" id="status" role="status"></p>
+    </form>
+  </div>
+
+  <section class="howto" data-howto="supernote" hidden>
+    <h2>Put it on your Supernote</h2>
+    <ol>
+      <li>Copy the PNG onto your Supernote, for example into the Document folder over USB.</li>
+      <li>Swipe down from the top of the screen and tap Settings → Display &amp; Input → Screensaver.</li>
+      <li>Tap <strong>More</strong>, browse to the file and tap it. Leave it at <strong>Fill</strong> (the image is already sized to the screen), then tap <strong>OK</strong>.</li>
+    </ol>
+    <p class="hint">You get a grayscale PNG at the screen's native resolution. The device does its own shading, so the preview shows smooth gray rather than a fixed set of shades.</p>
+  </section>
+
+  <section class="howto" data-howto="kobo" hidden>
+    <h2>Put it on your Kobo</h2>
+    <ol>
+      <li>Connect the Kobo to your computer with USB and tap <strong>Connect</strong> on the reader.</li>
+      <li>Open the <code>.kobo</code> folder on the Kobo drive and create a folder named <code>screensaver</code> (lowercase). It's a hidden folder: on a Mac press Cmd+Shift+. to show it; on Windows turn on hidden items.</li>
+      <li>Copy the PNG into <code>.kobo/screensaver</code>. Add more images if you like; the Kobo picks one at random.</li>
+      <li>Eject the Kobo, then go to Settings → Energy saving and privacy and turn on <strong>Show book covers full screen</strong>. If your image doesn't appear, some people find it works with that setting off instead.</li>
+    </ol>
+    <p class="hint">This uses the Kobo's own firmware with no mods. On Colour models the image is still grayscale.</p>
+  </section>
+
+  <section class="howto" data-howto="kindle" hidden>
+    <h2>Put it on your Kindle</h2>
+    <ol>
+      <li><strong>Jailbroken Kindle with a screensaver hack:</strong> copy the PNG into the hack's screensaver folder (for the classic ScreenSavers hack, <code>linkss/screensavers</code>), then follow that hack's steps to apply it.</li>
+      <li><strong>Stock Kindle:</strong> Amazon doesn't let you load a custom screensaver. The closest you can get is <strong>Display Cover</strong>, which shows the cover of the book you're reading. Make this image the cover of a book (Calibre can do it), send it to your Kindle, open it, and turn on Display Cover in Settings. Ad-supported Kindles need ads removed first.</li>
+    </ol>
+    <p class="hint">Kindle screensaver hacks need an 8-bit grayscale PNG at the screen's exact resolution. Other PNGs can make some Kindles freeze when they sleep. This file is saved in exactly that format.</p>
+  </section>
+
+  <section class="howto" data-howto="xteink">
+    <h2>Put it on your reader</h2>
+    <ol>
+      <li>Copy the file to your SD card. Name it <code>sleep.bmp</code> in the root folder to use just this one, or put any number of BMPs in a folder named <code>.sleep</code> and CrossPoint picks one at random each time.</li>
+      <li>On the reader, open Settings → Display → Sleep Screen and choose <strong>Custom</strong>.</li>
+      <li>Put the reader to sleep to see it.</li>
+    </ol>
+    <p class="hint">The file is saved with a palette of exactly the panel's four grays. CrossPoint draws images like that pixel for pixel. A regular 24-bit BMP gets dithered again on the device, so it won't match what you previewed.</p>
+  </section>
+</div>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Full-screen preview" hidden>
+  <div class="lb-bar">
+    <span class="meta" id="lbMeta"></span>
+    <div class="row">
+      <button type="button" class="small" id="lbActual" aria-pressed="false">Actual pixels</button>
+      <button type="button" class="small" id="lbClose">Close</button>
+    </div>
+  </div>
+  <div class="lb-body" id="lbBody"><canvas id="lbCanvas" width="528" height="792"></canvas></div>
+</div>
+
+<script>
+(() => {
+  // fmt: 'bmp4' = CrossPoint 8-bit BMP with the 4 native grays; 'png' = 8-bit grayscale PNG
+  const D = (group, label, w, h, fmt, howto) => ({ group, label: `${label} · ${w}×${h}`, size: [w, h], fmt, howto,
+    file: fmt === 'png' ? 'screensaver.png' : 'sleep.bmp' });
+  const DEVICES = {
+    x3: D('Xteink (CrossPoint)', 'X3', 528, 792, 'bmp4', 'xteink'),
+    x4: D('Xteink (CrossPoint)', 'X4', 480, 800, 'bmp4', 'xteink'),
+    manta: D('Supernote', 'Manta', 1920, 2560, 'png', 'supernote'),
+    nomad: D('Supernote', 'Nomad', 1404, 1872, 'png', 'supernote'),
+    koboClara: D('Kobo', 'Clara 2E / BW / Colour', 1072, 1448, 'png', 'kobo'),
+    koboLibra: D('Kobo', 'Libra 2 / Libra Colour', 1264, 1680, 'png', 'kobo'),
+    koboSage: D('Kobo', 'Sage', 1440, 1920, 'png', 'kobo'),
+    koboElipsa: D('Kobo', 'Elipsa 2E', 1404, 1872, 'png', 'kobo'),
+    kindle: D('Kindle', 'Kindle (2022 / 2024)', 1072, 1448, 'png', 'kindle'),
+    kindlePW11: D('Kindle', 'Paperwhite (2021)', 1236, 1648, 'png', 'kindle'),
+    kindlePW12: D('Kindle', 'Paperwhite (2024) / Colorsoft', 1264, 1680, 'png', 'kindle'),
+    kindleOasis: D('Kindle', 'Oasis', 1264, 1680, 'png', 'kindle'),
+    kindleScribe: D('Kindle', 'Scribe', 1860, 2480, 'png', 'kindle'),
+  };
+  (() => {   // build the device menu, grouped by brand
+    const sel = document.getElementById('deviceSel'); let og = null;
+    for (const [id, d] of Object.entries(DEVICES)) {
+      if (!og || og.label !== d.group) { og = document.createElement('optgroup'); og.label = d.group; sel.appendChild(og); }
+      og.appendChild(new Option(d.label, id));
+    }
+    sel.value = 'x3';
+  })();
+
+  const LEVELS = [0, 85, 170, 255];
+  const FIT_HINTS = {
+    fill: 'Covers the whole screen. Parts that don\'t fit are cropped.',
+    fit: 'Shows the whole image. Empty space gets the background shade.',
+    width: 'Matches the screen width. The top and bottom may be cropped or show background.',
+    height: 'Matches the screen height. The sides may be cropped or show background.',
+    stretch: 'Fills the screen exactly. The image is distorted if its shape differs from the screen\'s.',
+    actual: 'One image pixel per screen pixel, centered. Large photos show only their middle.',
+    custom: 'Your own position and size. Pick any other option to snap back.',
+  };
+  const VIEW_HINTS = {
+    edit: 'Drag to move. Drag a corner to resize, or an edge to stretch. Scroll or pinch to zoom.',
+    preview: 'This is what the screen will show.',
+    compare: 'Drag across the screen to compare your original with the device result.',
+  };
+  const $ = (id) => document.getElementById(id);
+  const screen = $('screen'), sctx = screen.getContext('2d');
+  const before = $('before'), bctx = before.getContext('2d');
+  const work = document.createElement('canvas'), wctx = work.getContext('2d', { willReadFrequently: true });
+
+  let source = null;       // canvas holding the original image
+  let thumb = null;        // rotated, reduced copy used for the ghost and while dragging
+  let rotation = 0;        // quarter turns clockwise
+  let place = null;        // {x, y, w, h}: where the rotated image sits, in device pixels
+  let fitMode = 'fill';
+  let bgShade = 3;
+  let view = 'edit';
+  let curDev = 'x3';
+  let lastIndex = null;    // Uint8Array of 0..3 shade indices (Xteink)
+  let lastGray = null;     // Float32Array of 0..255 gray (PNG devices)
+  let usingSample = true;
+  let pending = false, settleTimer = 0;
+
+  // ---------- sample image (drawn, so the page opens in a working state)
+  function makeSample() {
+    const c = document.createElement('canvas'); c.width = 1056; c.height = 1584;
+    const x = c.getContext('2d');
+    const sky = x.createLinearGradient(0, 0, 0, c.height);
+    sky.addColorStop(0, '#0e1a33'); sky.addColorStop(0.55, '#6c7fa8'); sky.addColorStop(1, '#e6e9f0');
+    x.fillStyle = sky; x.fillRect(0, 0, c.width, c.height);
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    x.fillStyle = '#ffffff';
+    for (let i = 0; i < 140; i++) { const r = rnd() * 2.6 + 0.6; x.beginPath(); x.arc(rnd() * c.width, rnd() * c.height * 0.5, r, 0, 7); x.fill(); }
+    const glow = x.createRadialGradient(720, 360, 40, 720, 360, 320);
+    glow.addColorStop(0, 'rgba(255,255,240,.55)'); glow.addColorStop(1, 'rgba(255,255,240,0)');
+    x.fillStyle = glow; x.fillRect(0, 0, c.width, c.height);
+    x.fillStyle = '#f7f3e1'; x.beginPath(); x.arc(720, 360, 120, 0, 7); x.fill();
+    x.fillStyle = '#26365c'; x.beginPath(); x.arc(770, 320, 108, 0, 7); x.fill();
+    const hill = (y, col, amp, f, ph) => { x.fillStyle = col; x.beginPath(); x.moveTo(0, c.height);
+      for (let px = 0; px <= c.width; px += 8) x.lineTo(px, y + Math.sin(px * f + ph) * amp + Math.sin(px * f * 2.7) * amp * 0.3);
+      x.lineTo(c.width, c.height); x.fill(); };
+    hill(1080, '#3b4866', 60, 0.006, 1); hill(1220, '#232b3d', 50, 0.009, 3); hill(1380, '#0f131b', 40, 0.012, 5);
+    x.fillStyle = '#ffffff'; x.textAlign = 'center';
+    x.font = '700 96px "Atkinson Hyperlegible", system-ui, sans-serif'; x.fillText('Good night', c.width / 2, 1500);
+    x.font = '400 40px "Atkinson Hyperlegible", system-ui, sans-serif'; x.fillText('sample image · drop yours in', c.width / 2, 1550);
+    return c;
+  }
+
+  // ---------- geometry
+  const devSize = () => DEVICES[$('deviceSel').value].size;
+  const rotDims = () => (rotation % 2 ? [source.height, source.width] : [source.width, source.height]);
+  const gray = (i) => `rgb(${LEVELS[i]},${LEVELS[i]},${LEVELS[i]})`;
+
+  function placeFor(mode, W, H) {
+    const [rw, rh] = rotDims();
+    if (mode === 'stretch') return { x: 0, y: 0, w: W, h: H };
+    const s = { fill: Math.max(W / rw, H / rh), fit: Math.min(W / rw, H / rh), width: W / rw, height: H / rh, actual: 1 }[mode] ?? Math.max(W / rw, H / rh);
+    const w = rw * s, h = rh * s;
+    return { x: (W - w) / 2, y: (H - h) / 2, w, h };
+  }
+
+  function makeThumb() {
+    const [rw, rh] = rotDims(), s = Math.min(1, 1400 / Math.max(rw, rh));
+    const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(rw * s)); c.height = Math.max(1, Math.round(rh * s));
+    const x = c.getContext('2d'); x.imageSmoothingQuality = 'high';
+    x.translate(c.width / 2, c.height / 2); x.rotate(rotation * Math.PI / 2);
+    const tw = source.width * s, th = source.height * s;
+    x.drawImage(source, -tw / 2, -th / 2, tw, th);
+    c.className = 'ghost'; c.setAttribute('aria-hidden', 'true');
+    if (thumb) thumb.replaceWith(c); else $('screenWrap').prepend(c);
+    thumb = c;
+  }
+
+  function setFit(mode) {
+    fitMode = mode;
+    $('fit-' + mode).checked = true;
+    $('fitHint').textContent = FIT_HINTS[mode];
+  }
+  function applyFit(mode) {
+    setFit(mode);
+    const [W, H] = devSize();
+    place = placeFor(mode === 'custom' ? 'fill' : mode, W, H);
+  }
+
+  // ---------- pipeline
+  function settings() {
+    const v = (n) => document.querySelector(`input[name="${n}"]:checked`).value;
+    return { device: $('deviceSel').value, render: v('render'),
+      brightness: +$('brightness').value, contrast: +$('contrast').value,
+      auto: $('auto').checked, invert: $('invert').checked };
+  }
+
+  function compose(W, H) {
+    work.width = W; work.height = H;
+    wctx.fillStyle = gray(bgShade); wctx.fillRect(0, 0, W, H);
+    // destination size in the unrotated image's own frame
+    const dw = rotation % 2 ? place.h : place.w, dh = rotation % 2 ? place.w : place.h;
+    let img = source, iw = source.width, ih = source.height;
+    while (iw / 2 > dw && ih / 2 > dh && iw > 2 && ih > 2) {   // step-down resize for clean large reductions
+      const t = document.createElement('canvas'); t.width = Math.round(iw / 2); t.height = Math.round(ih / 2);
+      const tc = t.getContext('2d'); tc.imageSmoothingQuality = 'high'; tc.drawImage(img, 0, 0, t.width, t.height);
+      img = t; iw = t.width; ih = t.height;
+    }
+    wctx.save(); wctx.imageSmoothingQuality = 'high';
+    wctx.translate(place.x + place.w / 2, place.y + place.h / 2); wctx.rotate(rotation * Math.PI / 2);
+    wctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+    wctx.restore();
+    return wctx.getImageData(0, 0, W, H).data;
+  }
+
+  function toGray(rgba, W, H, s) {
+    const n = W * H, g = new Float32Array(n);
+    for (let i = 0, j = 0; i < n; i++, j += 4) g[i] = (77 * rgba[j] + 150 * rgba[j + 1] + 29 * rgba[j + 2]) >> 8; // same weights as CrossPoint
+    if (s.auto) {
+      const hist = new Uint32Array(256); for (let i = 0; i < n; i++) hist[g[i] | 0]++;
+      const cut = n * 0.005; let lo = 0, hi = 255, acc = 0;
+      while (lo < 255 && (acc += hist[lo]) <= cut) lo++;
+      acc = 0; while (hi > 0 && (acc += hist[hi]) <= cut) hi--;
+      if (hi > lo) { const m = 255 / (hi - lo); for (let i = 0; i < n; i++) g[i] = (g[i] - lo) * m; }
+    }
+    const c = s.contrast, b = s.brightness;
+    for (let i = 0; i < n; i++) {
+      let v = (g[i] - 128) * c + 128 + b;
+      if (s.invert) v = 255 - v;
+      g[i] = v < 0 ? 0 : v > 255 ? 255 : v;
+    }
+    return g;
+  }
+
+  function sharpen(g, W, H, amount) {   // unsharp mask with a 3×3 box blur
+    const out = new Float32Array(g.length);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let sum = 0, cnt = 0;
+      for (let dy = -1; dy <= 1; dy++) { const yy = y + dy; if (yy < 0 || yy >= H) continue;
+        for (let dx = -1; dx <= 1; dx++) { const xx = x + dx; if (xx < 0 || xx >= W) continue; sum += g[yy * W + xx]; cnt++; } }
+      const i = y * W + x, v = g[i] + amount * (g[i] - sum / cnt);
+      out[i] = v < 0 ? 0 : v > 255 ? 255 : v;
+    }
+    return out;
+  }
+
+  function snapClean(g) {               // thresholds tuned in the comic converter
+    const idx = new Uint8Array(g.length);
+    for (let i = 0; i < g.length; i++) { const v = g[i]; idx[i] = v < 48 ? 0 : v < 128 ? 1 : v < 212 ? 2 : 3; }
+    return idx;
+  }
+
+  function atkinson(g, W, H) {          // same family of dither CrossPoint uses on-device
+    const a = Float32Array.from(g), idx = new Uint8Array(g.length);
+    const taps = [[1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [0, 2]];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x, o = a[i];
+      let q = Math.round(o / 85); q = q < 0 ? 0 : q > 3 ? 3 : q;
+      idx[i] = q; const e = (o - q * 85) / 8;
+      for (const [dx, dy] of taps) { const xx = x + dx, yy = y + dy; if (xx >= 0 && xx < W && yy < H) a[yy * W + xx] += e; }
+    }
+    return idx;
+  }
+
+  function sizeCanvases(W, H) {
+    if (screen.width !== W || screen.height !== H) { screen.width = W; screen.height = H; }
+    if (before.width !== W || before.height !== H) { before.width = W; before.height = H; }
+  }
+
+  function render() {
+    pending = false;
+    const s = settings(), dev = DEVICES[s.device], [W, H] = dev.size;
+    const rgba = compose(W, H);
+    sizeCanvases(W, H);
+    bctx.drawImage(work, 0, 0);                      // the "Original" side of Compare
+    const g = toGray(rgba, W, H, s);
+    const out = sctx.createImageData(W, H), d = out.data;
+    if (dev.fmt === 'png') {
+      lastGray = g; lastIndex = null;
+      for (let i = 0, j = 0; i < g.length; i++, j += 4) { d[j] = d[j + 1] = d[j + 2] = g[i]; d[j + 3] = 255; }
+      sctx.putImageData(out, 0, 0);
+      $('shades').innerHTML = '<div class="shade"><div class="chip" style="background:linear-gradient(90deg,var(--paper-0),var(--paper-3))"></div><span>Full grayscale · shaded by the device</span></div>';
+      $('meta').textContent = `${W}×${H} · grayscale PNG`;
+    } else {
+      const idx = s.render === 'clean' ? snapClean(sharpen(g, W, H, 1.2)) : atkinson(g, W, H);
+      lastIndex = idx; lastGray = null;
+      const counts = [0, 0, 0, 0];
+      for (let i = 0, j = 0; i < idx.length; i++, j += 4) { const v = LEVELS[idx[i]]; d[j] = d[j + 1] = d[j + 2] = v; d[j + 3] = 255; counts[idx[i]]++; }
+      sctx.putImageData(out, 0, 0);
+      drawShades(counts, idx.length);
+      $('meta').textContent = `${W}×${H} · 8-bit BMP · ${Math.round(bmpSize(W, H) / 1024)} KB`;
+    }
+    screen.classList.remove('drafting');
+    updateBox();
+    if (!$('lightbox').hidden) paintLightbox();
+  }
+  function schedule() { clearTimeout(settleTimer); if (!pending) { pending = true; requestAnimationFrame(render); } }
+  function settle() { clearTimeout(settleTimer); settleTimer = setTimeout(schedule, 160); }
+
+  // Fast preview while dragging: the reduced copy drawn straight to the screen, shown in grayscale.
+  function drawDraft() {
+    const [W, H] = devSize(); sizeCanvases(W, H);
+    sctx.fillStyle = gray(bgShade); sctx.fillRect(0, 0, W, H);
+    sctx.imageSmoothingQuality = 'low';
+    sctx.drawImage(thumb, place.x, place.y, place.w, place.h);
+    screen.classList.add('drafting');
+  }
+
+  function updateBox() {
+    if (!place) return;
+    const [W] = devSize(), k = screen.clientWidth / W, b = $('box').style;
+    b.left = place.x * k + 'px'; b.top = place.y * k + 'px'; b.width = place.w * k + 'px'; b.height = place.h * k + 'px';
+    const t = thumb.style;
+    t.left = place.x * k + 'px'; t.top = place.y * k + 'px'; t.width = place.w * k + 'px'; t.height = place.h * k + 'px';
+    // zoom slider is relative to "Fit" (100% = whole image visible)
+    const [H] = [devSize()[1]], f = placeFor('fit', W, H);
+    const z = Math.log2(Math.max(place.w / f.w, place.h / f.h));
+    $('scale').value = Math.max(-2, Math.min(3, z)).toFixed(2);
+    $('scaleOut').textContent = Math.round(2 ** z * 100) + '%';
+    const [rw, rh] = rotDims(), sx = place.w / rw * 100, sy = place.h / rh * 100;
+    const sc = Math.abs(sx - sy) < 0.5 ? `${sx.toFixed(sx < 10 ? 1 : 0)}%` : `${sx.toFixed(0)}% × ${sy.toFixed(0)}%`;
+    $('placeOut').textContent = `Scale ${sc} · at ${Math.round(place.x)}, ${Math.round(place.y)}`;
+  }
+
+  function changed() { if (fitMode !== 'custom') setFit('custom'); updateBox(); drawDraft(); }
+
+  function zoomAbout(px, py, s) {
+    const [W, H] = devSize(), minSide = 8, maxSide = Math.max(W, H) * 40;
+    s = Math.max(minSide / Math.min(place.w, place.h), Math.min(maxSide / Math.max(place.w, place.h), s));
+    place = { x: px - (px - place.x) * s, y: py - (py - place.y) * s, w: place.w * s, h: place.h * s };
+  }
+
+  function drawShades(counts, total) {
+    const names = ['Black', 'Dark gray', 'Light gray', 'White'];
+    $('shades').innerHTML = counts.map((c, i) =>
+      `<div class="shade" title="${names[i]}"><div class="chip" style="background:var(--paper-${i})"></div><span>${names[i]} ${Math.round(c / total * 100)}%</span></div>`).join('');
+  }
+
+  // ---------- direct manipulation on the screen
+  const editor = $('editor');
+  const pointers = new Map();
+  let drag = null, split = 0.5;
+
+  function devPoint(e) {
+    const r = screen.getBoundingClientRect(), [W] = devSize(), k = r.width / W;
+    return { x: (e.clientX - r.left) / k, y: (e.clientY - r.top) / k, k };
+  }
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+  function setSplit(e) {
+    const r = screen.getBoundingClientRect();
+    split = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    before.style.clipPath = `inset(0 ${((1 - split) * 100).toFixed(2)}% 0 0)`;
+    $('split').style.left = (split * 100).toFixed(2) + '%';
+  }
+
+  editor.addEventListener('pointerdown', (e) => {
+    if (view === 'preview' || e.button > 0) return;
+    e.preventDefault(); editor.focus({ preventScroll: true });
+    editor.setPointerCapture(e.pointerId);
+    if (view === 'compare') { drag = { type: 'split' }; setSplit(e); return; }
+    const p = devPoint(e); pointers.set(e.pointerId, p);
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      drag = { type: 'pinch', d0: dist(a, b) || 1, m0: mid(a, b), p0: { ...place } };
+      return;
+    }
+    const h = e.target.dataset && e.target.dataset.h;
+    drag = { type: h ? 'resize' : 'move', h, start: p, p0: { ...place } };
+  });
+
+  editor.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    if (drag.type === 'split') { setSplit(e); return; }
+    const p = devPoint(e);
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, p);
+    const [W, H] = devSize(), p0 = drag.p0;
+    if (drag.type === 'pinch') {
+      if (pointers.size < 2) return;
+      const [a, b] = [...pointers.values()], m = mid(a, b), s = dist(a, b) / drag.d0;
+      place = { ...p0 }; zoomAbout(drag.m0.x, drag.m0.y, s);
+      place.x += m.x - drag.m0.x; place.y += m.y - drag.m0.y;
+    } else if (drag.type === 'move') {
+      let x = p0.x + p.x - drag.start.x, y = p0.y + p.y - drag.start.y;
+      const t = 7 / p.k;   // snap the image's center to the screen's center
+      const snapX = Math.abs(x + p0.w / 2 - W / 2) < t, snapY = Math.abs(y + p0.h / 2 - H / 2) < t;
+      if (snapX) x = W / 2 - p0.w / 2;
+      if (snapY) y = H / 2 - p0.h / 2;
+      $('guideV').hidden = !snapX; $('guideH').hidden = !snapY;
+      place = { x, y, w: p0.w, h: p0.h };
+    } else {
+      const h = drag.h, dx = p.x - drag.start.x, dy = p.y - drag.start.y, min = 8;
+      const hx = h.includes('e') ? 1 : h.includes('w') ? -1 : 0, hy = h.includes('s') ? 1 : h.includes('n') ? -1 : 0;
+      const L = p0.x, T = p0.y, R = p0.x + p0.w, B = p0.y + p0.h;
+      if (hx && hy && !e.shiftKey) {        // corner: keep proportions, anchor the opposite corner
+        let s = Math.max((p0.w + hx * dx) / p0.w, (p0.h + hy * dy) / p0.h);
+        s = Math.max(s, min / Math.min(p0.w, p0.h));
+        const w = p0.w * s, hh = p0.h * s;
+        place = { x: hx > 0 ? L : R - w, y: hy > 0 ? T : B - hh, w, h: hh };
+      } else {                              // edge (or Shift+corner): stretch freely
+        let l = L, r = R, t = T, b = B;
+        if (hx > 0) r = Math.max(l + min, R + dx); if (hx < 0) l = Math.min(r - min, L + dx);
+        if (hy > 0) b = Math.max(t + min, B + dy); if (hy < 0) t = Math.min(b - min, T + dy);
+        place = { x: l, y: t, w: r - l, h: b - t };
+      }
+    }
+    changed();
+  });
+
+  function endPointer(e) {
+    pointers.delete(e.pointerId);
+    if (!drag) return;
+    if (drag.type === 'pinch' && pointers.size === 1) {   // keep panning with the remaining finger
+      const [id, p] = [...pointers.entries()][0];
+      drag = { type: 'move', start: pointers.get(id) || p, p0: { ...place } }; return;
+    }
+    if (pointers.size === 0) {
+      const wasSplit = drag.type === 'split';
+      drag = null; $('guideV').hidden = true; $('guideH').hidden = true;
+      if (!wasSplit) schedule();
+    }
+  }
+  editor.addEventListener('pointerup', endPointer);
+  editor.addEventListener('pointercancel', endPointer);
+
+  editor.addEventListener('wheel', (e) => {
+    if (view !== 'edit') return;
+    e.preventDefault();
+    const p = devPoint(e), unit = e.deltaMode === 1 ? 16 : 1;
+    zoomAbout(p.x, p.y, Math.exp(-e.deltaY * unit * 0.0015));
+    changed(); settle();
+  }, { passive: false });
+
+  editor.addEventListener('keydown', (e) => {
+    if (view !== 'edit') return;
+    const step = e.shiftKey ? 10 : 1, [W, H] = devSize();
+    const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    if (moves[e.key]) { place = { ...place, x: place.x + moves[e.key][0], y: place.y + moves[e.key][1] }; }
+    else if (e.key === '+' || e.key === '=') zoomAbout(place.x + place.w / 2, place.y + place.h / 2, 1.05);
+    else if (e.key === '-' || e.key === '_') zoomAbout(place.x + place.w / 2, place.y + place.h / 2, 1 / 1.05);
+    else return;
+    e.preventDefault(); changed(); settle();
+  });
+
+  new ResizeObserver(updateBox).observe(screen);
+
+  // ---------- views and full screen
+  function setView(v) {
+    view = v; $('stage').dataset.view = v; $('viewHint').textContent = VIEW_HINTS[v];
+    if (v === 'compare') setSplit({ clientX: screen.getBoundingClientRect().left + screen.clientWidth * split });
+  }
+
+  function paintLightbox() {
+    const c = $('lbCanvas'), [W, H] = devSize(), actual = $('lbBody').classList.contains('actual');
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    c.getContext('2d').drawImage(screen, 0, 0);
+    c.style.width = actual ? W / (window.devicePixelRatio || 1) + 'px' : '';
+    c.style.height = actual ? H / (window.devicePixelRatio || 1) + 'px' : '';
+    $('lbMeta').textContent = `${DEVICES[$('deviceSel').value].label}${actual ? ' · actual pixels' : ''}`;
+  }
+  function openLightbox() {
+    $('lightbox').hidden = false; document.body.classList.add('locked');
+    paintLightbox(); $('lbClose').focus();
+  }
+  function closeLightbox() {
+    $('lightbox').hidden = true; document.body.classList.remove('locked'); $('fullBtn').focus();
+  }
+  $('fullBtn').addEventListener('click', openLightbox);
+  $('lbClose').addEventListener('click', closeLightbox);
+  $('lbActual').addEventListener('click', () => {
+    const on = $('lbBody').classList.toggle('actual');
+    $('lbActual').setAttribute('aria-pressed', String(on)); paintLightbox();
+  });
+  $('lbBody').addEventListener('click', (e) => { if (e.target === $('lbBody')) closeLightbox(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('lightbox').hidden) closeLightbox(); });
+
+  // ---------- BMP writer: 8-bit, 4-entry palette (0/85/170/255), bottom-up rows
+  function bmpSize(W, H) { return 14 + 40 + 16 + ((W + 3) & ~3) * H; }
+  function encodeBMP(idx, W, H) {
+    const row = (W + 3) & ~3, off = 14 + 40 + 16, size = off + row * H;
+    const buf = new ArrayBuffer(size), v = new DataView(buf), u = new Uint8Array(buf);
+    u[0] = 0x42; u[1] = 0x4D; v.setUint32(2, size, true); v.setUint32(10, off, true);
+    v.setUint32(14, 40, true); v.setInt32(18, W, true); v.setInt32(22, H, true);
+    v.setUint16(26, 1, true); v.setUint16(28, 8, true); v.setUint32(30, 0, true);
+    v.setUint32(34, row * H, true); v.setInt32(38, 2835, true); v.setInt32(42, 2835, true);
+    v.setUint32(46, 4, true); v.setUint32(50, 4, true);
+    LEVELS.forEach((g, i) => { u[54 + i * 4] = g; u[55 + i * 4] = g; u[56 + i * 4] = g; u[57 + i * 4] = 0; });
+    for (let y = 0; y < H; y++) u.set(idx.subarray((H - 1 - y) * W, (H - y) * W), off + y * row);
+    return new Blob([buf], { type: 'image/bmp' });
+  }
+
+  // ---------- PNG writer: 8-bit grayscale (color type 0), which Kindle screensaver hacks require
+  const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(bytes) { let c = 0xFFFFFFFF; for (let i = 0; i < bytes.length; i++) c = CRC[(c ^ bytes[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function chunk(type, data) {
+    const out = new Uint8Array(12 + data.length), v = new DataView(out.buffer);
+    v.setUint32(0, data.length); for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+    out.set(data, 8); v.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
+    return out;
+  }
+  async function encodePNGGray(gray, W, H) {
+    const raw = new Uint8Array((W + 1) * H);
+    for (let y = 0; y < H; y++) {           // "Sub" filter on every row: compresses well, cheap
+      const o = y * (W + 1), r = y * W; raw[o] = 1; let prev = 0;
+      for (let x = 0; x < W; x++) { const v = Math.round(gray[r + x]); raw[o + 1 + x] = (v - prev) & 255; prev = v; }
+    }
+    const z = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
+    const ihdr = new Uint8Array(13), hv = new DataView(ihdr.buffer);
+    hv.setUint32(0, W); hv.setUint32(4, H); ihdr[8] = 8; ihdr[9] = 0;   // 8-bit, grayscale
+    const sig = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+    return new Blob([sig, chunk('IHDR', ihdr), chunk('IDAT', z), chunk('IEND', new Uint8Array(0))], { type: 'image/png' });
+  }
+
+  function save(blob, name, where) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    status(`Saved ${name}. Copy it to ${where}${usingSample ? ' (this is the sample image)' : ''}.`);
+  }
+
+  function download() {
+    if (pending || screen.classList.contains('drafting')) render();   // never save a half-finished drag
+    const dev = DEVICES[settings().device], [W, H] = dev.size, e = dev.fmt === 'png' ? '.png' : '.bmp';
+    let name = $('filename').value.trim().replace(/[\\/:*?"<>|]+/g, '_') || dev.file;
+    name = name.replace(/\.(bmp|png)$/i, '') + e;
+    if (dev.fmt === 'png') {
+      if (!lastGray) return;
+      const where = { supernote: 'your Supernote', kobo: 'the .kobo/screensaver folder', kindle: 'your Kindle' }[dev.howto];
+      status('Creating PNG…');
+      encodePNGGray(lastGray, W, H)
+        .then((b) => save(b, name, where))
+        .catch(() => status('Couldn\'t create the PNG. Your browser may be too old; try a current Chrome, Firefox or Safari.'));
+      return;
+    }
+    if (!lastIndex) return;
+    save(encodeBMP(lastIndex, W, H), name, 'your SD card');
+  }
+  function status(t) { $('status').textContent = t; }
+
+  // ---------- device switching and file loading
+  function applyDevice() {
+    const id = $('deviceSel').value, dev = DEVICES[id], png = dev.fmt === 'png';
+    const [oW, oH] = DEVICES[curDev].size, [W, H] = dev.size;
+    if (fitMode === 'custom') {   // keep the user's framing: same relative center, uniform scale
+      const s = Math.min(W / oW, H / oH), cx = (place.x + place.w / 2) / oW * W, cy = (place.y + place.h / 2) / oH * H;
+      const w = place.w * s, h = place.h * s;
+      place = { x: cx - w / 2, y: cy - h / 2, w, h };
+    } else place = placeFor(fitMode, W, H);
+    curDev = id;
+    $('renderSet').hidden = png;
+    document.querySelectorAll('[data-howto]').forEach((el) => { el.hidden = el.dataset.howto !== dev.howto; });
+    $('device').classList.toggle('tablet', png);
+    const name = $('filename').value.trim(), base = name.replace(/\.(bmp|png)$/i, '');
+    const isDefault = !name || base === 'sleep' || base === 'screensaver';
+    $('filename').value = (isDefault ? dev.file.replace(/\.\w+$/, '') : base) + (png ? '.png' : '.bmp');
+    $('download').textContent = png ? 'Download PNG' : 'Download BMP';
+  }
+
+  function useSource(c) {
+    source = c; rotation = 0; makeThumb();
+    applyFit(fitMode === 'custom' ? 'fill' : fitMode);
+    schedule();
+  }
+
+  function loadFile(file) {
+    if (!file || !file.type.startsWith('image/')) { status('That file isn\'t an image. Try a JPG, PNG, WebP or GIF.'); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext('2d').drawImage(img, 0, 0); URL.revokeObjectURL(url);
+      usingSample = false;
+      const stem = file.name.replace(/\.[^.]+$/, '').replace(/[^\w\-]+/g, '_').slice(0, 40) || 'sleep';
+      $('filename').value = stem + (DEVICES[$('deviceSel').value].fmt === 'png' ? '.png' : '.bmp');
+      $('dropHint').textContent = `${file.name} · ${img.naturalWidth}×${img.naturalHeight}`;
+      status(''); useSource(c);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); status('Couldn\'t read that image. It may be damaged or in a format your browser can\'t open.'); };
+    img.src = url;
+  }
+
+  // ---------- wiring
+  $('file').addEventListener('change', (e) => loadFile(e.target.files[0]));
+  $('rotate').addEventListener('click', () => {
+    rotation = (rotation + 1) % 4; makeThumb();
+    if (fitMode === 'custom') {   // turn the box in place around its center
+      const cx = place.x + place.w / 2, cy = place.y + place.h / 2;
+      place = { x: cx - place.h / 2, y: cy - place.w / 2, w: place.h, h: place.w };
+    } else applyFit(fitMode);
+    schedule();
+  });
+  $('centerBtn').addEventListener('click', () => {
+    const [W, H] = devSize(); place = { ...place, x: (W - place.w) / 2, y: (H - place.h) / 2 };
+    changed(); schedule();
+  });
+  $('scale').addEventListener('input', () => {
+    const [W, H] = devSize(), f = placeFor('fit', W, H);
+    const cur = Math.max(place.w / f.w, place.h / f.h), target = 2 ** +$('scale').value;
+    zoomAbout(place.x + place.w / 2, place.y + place.h / 2, target / cur);
+    changed(); settle();
+  });
+
+  $('controls').addEventListener('input', (e) => {
+    const t = e.target;
+    if (t.id === 'file' || t.id === 'filename' || t.id === 'scale') return;
+    if (t.name === 'fit') { applyFit(t.value); schedule(); return; }
+    if (t.name === 'bg') bgShade = +t.value;
+    $('brightnessOut').textContent = $('brightness').value;
+    $('contrastOut').textContent = (+$('contrast').value).toFixed(2) + '×';
+    $('device').classList.toggle('pixels', $('pixels').checked);
+    if (t.id === 'deviceSel') applyDevice();
+    schedule();
+  });
+  document.querySelectorAll('input[name="view"]').forEach((r) => r.addEventListener('change', () => setView(r.value)));
+  $('controls').addEventListener('submit', (e) => { e.preventDefault(); download(); });
+  $('reset').addEventListener('click', () => {
+    $('brightness').value = 0; $('contrast').value = 1; $('auto').checked = true; $('invert').checked = false;
+    $('rd-dither').checked = true; $('bg-3').checked = true; bgShade = 3;
+    rotation = 0; makeThumb(); applyFit('fill');
+    $('brightnessOut').textContent = '0'; $('contrastOut').textContent = '1.00×'; schedule();
+  });
+
+  const stage = $('stage');
+  const hasFiles = (e) => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+  ['dragenter', 'dragover'].forEach((t) => document.addEventListener(t, (e) => { if (!hasFiles(e)) return; e.preventDefault(); stage.classList.add('dropping'); }));
+  ['dragleave', 'drop'].forEach((t) => document.addEventListener(t, (e) => { if (!hasFiles(e)) return; e.preventDefault(); if (t === 'drop' || e.target === document.documentElement) stage.classList.remove('dropping'); }));
+  document.addEventListener('drop', (e) => { const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) loadFile(f); });
+  document.addEventListener('paste', (e) => { const f = [...(e.clipboardData?.files || [])].find((x) => x.type.startsWith('image/')); if (f) loadFile(f); });
+
+  setView('edit');
+  useSource(makeSample()); render();
+  if (document.fonts) document.fonts.ready.then(() => { if (usingSample) { const keep = fitMode; useSource(makeSample()); if (keep !== 'custom') applyFit(keep); } });
+})();
+</script>
