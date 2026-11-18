@@ -1,68 +1,178 @@
+/*
+	Shared styles for the site's own pages (home, tools, about, 404).
+	The tools under tools/ each carry their own styles so they keep working
+	when copied elsewhere; they use the same colors as the ones named here.
+*/
 
-header {
-
-	background-color: #2b2034;
-
+/* The colors live in one place so light and dark mode only swap this list. */
+:root {
+	--bar: #2b2034;        /* header and footer background */
+	--bar-ink: #F5ECD1;    /* text on the bar */
+	--bar-hover: #37435F;
+	--brand: #8ecdf1;      /* site name, footer text */
+	--bg: #F5ECD1;
+	--ink: #1b1d2a;
+	--muted: #5d6275;
+	--card: #ffffff;
+	--line: #d9d3c7;
+	--link: #2b2034;
+	color-scheme: light dark;
 }
 
-header h1 {
-	margin: 0;
-	padding: 20px 0;
-	color: #8ecdf1;
-	text-decoration: none;
-	text-align: center;
-}
-nav ul {
-	list-style-type: none;
-	margin: 0;
-	padding: 0;
-	display: flex;
-	justify-content: space-evenly;
-
+/* Follow the visitor's system setting, the same way the tools do. */
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bar: #1a1520;
+		--bg: #2b2034;
+		--ink: #F5ECD1;
+		--muted: #a3a8bb;
+		--card: #37435F;
+		--line: #4a4a5a;
+		--link: #8ecdf1;
+	}
 }
 
-nav ul li a {
-	display: block;
-	color: #F5ECD1;
-	padding: 14px 16px;
-	text-decoration: none;
-
+/* Padding counts inside an element's width, so nothing pokes off a phone screen. */
+* {
+	box-sizing: border-box;
 }
-
-nav ul li a:hover {
-	background-color:#37435F;
-}
-
 
 body {
 	margin: 0;
 	min-height: 100vh;
 	display: flex;
 	flex-direction: column;
-	background-color: #F5ECD1;
+	background-color: var(--bg);
+	color: var(--ink);
+	/* The same system font the tools use, so the whole site reads as one. */
+	font: 17px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+header {
+	background-color: var(--bar);
+}
+
+header h1 {
+	margin: 0;
+	padding: 20px 16px 6px;
+	color: var(--brand);
+	text-align: center;
+}
+
+nav ul {
+	list-style-type: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	justify-content: center;
+	flex-wrap: wrap;
+}
+
+nav ul li a {
+	display: block;
+	color: var(--bar-ink);
+	padding: 14px 20px;
+	text-decoration: none;
+}
+
+nav ul li a:hover {
+	background-color: var(--bar-hover);
+}
+
+/* Marks the page you are on (set with aria-current in each page's nav). */
+nav ul li a[aria-current="page"] {
+	color: var(--brand);
+	box-shadow: inset 0 -3px 0 var(--brand);
+}
+
+/* Keyboard users need to see where they are; the default ring is hard to see on the dark bar. */
+a:focus-visible {
+	outline: 2px solid var(--brand);
+	outline-offset: 2px;
 }
 
 main {
 	flex: 1;
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	text-align: center;
+	width: 100%;
+	max-width: 760px;
+	margin: 0 auto;
+	padding: 36px 16px 56px;
 }
-p {
-	color: black;
 
-	justify-content: center;
+main a {
+	color: var(--link);
+}
 
+.lede {
+	margin: 0 0 8px;
 	font-size: 20px;
+}
+
+main h2 {
+	margin: 36px 0 12px;
+	font-size: 22px;
+}
+
+p {
+	margin: 0 0 14px;
+}
+
+.muted {
+	color: var(--muted);
+}
+
+/* Lists of tools and apps: one card each, the name on top and a line about it below. */
+.cards {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 12px;
+}
+
+.cards li {
+	background: var(--card);
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	padding: 16px 18px;
+}
+
+.cards li > a,
+.cards li > strong {
+	font-weight: 650;
+	font-size: 18px;
+}
+
+.cards p {
+	margin: 4px 0 0;
+	color: var(--muted);
+}
+
+/* Small label after a name, such as "iPhone" or "in beta". */
+.tag {
+	margin-left: 6px;
+	font-size: 13px;
+	color: var(--muted);
+	white-space: nowrap;
 }
 
 footer {
 	margin: 0;
-	padding: 10px;
+	padding: 14px 16px;
+	color: var(--brand);
+	background-color: var(--bar);
+	text-align: center;
+	font-size: 15px;
+}
 
-	color: #8ecdf1;
-	background-color: #2b2034;
+footer a {
+	color: var(--bar-ink);
+}
+
+/* The 404 page has one short message, so it sits in the middle. */
+.center {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
 	text-align: center;
 }

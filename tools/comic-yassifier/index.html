@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Comic Yassifier for Xteink X3</title>
+<meta name="description" content="Turn a CBZ comic into an .xtch for the Xteink X3: bigger speech bubbles, smart page splits, crisp 4-shade output. Runs in your browser.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
   :root{--bg:#F5ECD1;--ink:#1b1d2a;--muted:#5d6275;--card:#ffffff;--line:#d9d3c7;--accent:#2b2034;--bad:#c0392b}
   @media (prefers-color-scheme:dark){:root{--bg:#2b2034;--ink:#F5ECD1;--muted:#a3a8bb;--card:#37435F;--line:#4a4a5a;--accent:#8ecdf1;--bad:#ff7a6b}}
@@ -47,11 +49,14 @@
   .vopts{margin-top:10px;color:var(--muted);font-size:.88rem}
   #issues{margin:12px 0 0;padding-left:1.2em;font-size:.88rem}
   #issues li.err{color:var(--bad)} #issues li.warn{color:var(--muted)}
+  .back{margin:0 0 14px;font-size:.88rem}
+  .back a{color:var(--muted)}
   .note{color:var(--muted);font-size:.85rem;margin-top:36px;border-top:1px solid var(--line);padding-top:16px}
 </style>
 </head>
 <body>
 <main>
+  <p class="back"><a href="/tools.html">← Bleubirddy tools</a></p>
   <h1>Comic Yassifier for the Xteink X3</h1>
   <p class="sub">Drop a .cbz and get back a .xtch: bigger speech bubbles, smart page splits, crisp 4-shade e-ink output.</p>
 

@@ -1,11 +1,17 @@
 <!DOCTYPE html>
-<html lang = "en">
+<html lang="en">
 	<head>
-				<title>Bleubirddy</title>
-				<link rel="stylesheet" href="styles.css">
-				<meta charset="utf-8">
-				<meta name="viewport" content="width=device-width, initial-scale=1">
-
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>Bleubirddy: tools and apps for reading</title>
+		<meta name="description" content="Free browser tools for comics and e-readers, and apps for iPhone, iPad and Mac. Everything runs on your own device.">
+		<!-- What chat apps and social sites show when someone shares the link. -->
+		<meta property="og:title" content="Bleubirddy: tools and apps for reading">
+		<meta property="og:description" content="Free browser tools for comics and e-readers, and apps for iPhone, iPad and Mac. Everything runs on your own device.">
+		<meta property="og:type" content="website">
+		<meta property="og:url" content="https://bleubirddy.github.io/">
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+		<link rel="stylesheet" href="/styles.css">
 	</head>
 <body>
 	<header>
@@ -13,26 +19,61 @@
 
 	<nav>
 		<ul>
-			<li> <a href="tools.html">Tools</a></li>
-			<li> <a href="index.html">Home</a></li>
-			<li> <a href="######">About</a></li>
-			<li> <a href="######">News</a></li>
+			<li> <a href="/" aria-current="page">Home</a></li>
+			<li> <a href="/tools.html">Tools</a></li>
+			<li> <a href="/about.html">About</a></li>
 		</ul>
 	</nav>
 
 	</header>
 
 	<main>
-		
-		<p>Main Content Coming Soon, in the Meantime, checkout the Tools!</p>
+
+		<p class="lede">Small tools and apps for reading, watching and making things.</p>
+		<p class="muted">The tools run in your browser and the apps run on your device. Your files are never uploaded.</p>
+
+		<h2>Tools</h2>
+		<ul class="cards">
+			<li>
+				<a href="/tools/comic-to-epub/">Comic to EPUB</a>
+				<p>Turn CBZ, CBR and PDF comics into EPUBs, with foggy speech-bubble lettering cleaned up.</p>
+			</li>
+			<li>
+				<a href="/tools/comic-yassifier/">Comic Yassifier</a>
+				<p>Get comics ready for the Xteink X3: bigger speech bubbles, smart page splits, crisp 4-shade output.</p>
+			</li>
+			<li>
+				<a href="/tools/sleep-screen-maker/">Sleep Screen Maker</a>
+				<p>Turn any image into a sleep screen for Xteink, Supernote, Kobo and Kindle e-readers.</p>
+			</li>
+		</ul>
+
+		<h2>Apps</h2>
+		<ul class="cards">
+			<li>
+				<!-- Koios has no public page yet, so its name is not a link. -->
+				<strong>Koios</strong> <span class="tag">iPhone and iPad · in beta</span>
+				<p>A reader for the comics, ebooks, PDFs and audiobooks you own. No ads, no account, no tracking.
+					<a href="/koios-privacy/">Privacy policy</a></p>
+			</li>
+			<li>
+				<a href="https://github.com/BleuBirddy/RePaint">RePaint</a> <span class="tag">iPhone, iPad and Mac</span>
+				<p>A slicer for 3D printing, plus a painter that turns a picture into a filament painting.</p>
+			</li>
+			<li>
+				<a href="https://github.com/BleuBirddy/ReWatch">ReWatch</a> <span class="tag">iPhone, iPad and Mac</span>
+				<p>A media player built on mpv. It plays mkv, flac and other formats Apple's player won't open.</p>
+			</li>
+			<li>
+				<a href="https://github.com/BleuBirddy/PhoneZip">PhoneZip</a> <span class="tag">iPhone</span>
+				<p>Copies your photos, videos and documents to a USB drive and checks every file.</p>
+			</li>
+		</ul>
 
 	</main>
 
-
-
-
 <footer>
-	Footer
+	Made by Bleubirddy · <a href="https://github.com/BleuBirddy">GitHub</a>
 </footer>
 
 </body>

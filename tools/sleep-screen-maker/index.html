@@ -1,3 +1,11 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Without this line phones lay the page out about 980px wide and cut off the right side. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Turn any image into a sleep screen for Xteink, Supernote, Kobo and Kindle e-readers. Runs in your browser: your image never leaves your device.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>E-Reader Sleep Screen Maker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Atkinson+Hyperlegible+Mono:wght@400;600&display=swap">
@@ -47,6 +55,8 @@ body {
 body.locked { overflow: hidden; }
 .wrap { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
 header { display: flex; flex-direction: column; gap: 6px; max-width: 65ch; }
+.back { margin: 0 0 14px; font-size: 14px; }
+.back a { color: var(--muted); }
 .eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 h1 { font-size: clamp(28px, 4vw, 38px); line-height: 1.1; margin: 0; text-wrap: balance; }
 header p { margin: 0; color: var(--muted); }
@@ -193,9 +203,12 @@ code { font-family: var(--font-mono); font-size: .92em; background: var(--bg); b
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
+</head>
+<body>
 
 <div class="wrap">
   <header>
+    <p class="back"><a href="/tools.html">← Bleubirddy tools</a></p>
     <span class="eyebrow">Xteink · Supernote · Kobo · Kindle</span>
     <h1>Sleep Screen Maker</h1>
     <p>Turn any image into a sleep screen for your e-reader. Drag and resize it right on the screen, check the result, and download a file in the exact format your device reads. Everything runs in your browser; your image never leaves your device.</p>
@@ -945,3 +958,5 @@ code { font-family: var(--font-mono); font-size: .92em; background: var(--bg); b
   if (document.fonts) document.fonts.ready.then(() => { if (usingSample) { const keep = fitMode; useSource(makeSample()); if (keep !== 'custom') applyFit(keep); } });
 })();
 </script>
+</body>
+</html>

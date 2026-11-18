@@ -1,4 +1,4 @@
-# Comic to EPUB (Bleubirddy.io)
+# Comic to EPUB (bleubirddy.github.io)
 
 Turns CBZ, CBR and PDF comics into fixed-layout EPUBs, with foggy speech-bubble
 lettering cleaned up. Everything runs in the visitor's browser: no server, no uploads.
@@ -8,7 +8,7 @@ lettering cleaned up. Everything runs in the visitor's browser: no server, no up
 1. Copy this whole `comic-to-epub` folder into your GitHub Pages repo, for example
    at `tools/comic-to-epub/`.
 2. Commit and push. The tool is then live at
-   `https://bleubirddy.io/tools/comic-to-epub/`.
+   `https://bleubirddy.github.io/tools/comic-to-epub/`.
 3. Link to it from your nav or a blog post:
    ```html
    <a href="/tools/comic-to-epub/">Comic to EPUB</a>
