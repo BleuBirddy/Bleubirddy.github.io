@@ -137,8 +137,7 @@ p {
 	padding: 16px 18px;
 }
 
-.cards li > a,
-.cards li > strong {
+.cards li > a {
 	font-weight: 650;
 	font-size: 18px;
 }
@@ -146,6 +145,39 @@ p {
 .cards p {
 	margin: 4px 0 0;
 	color: var(--muted);
+}
+
+/* The line of links under a card or an app section. */
+.links {
+	font-size: 15px;
+}
+
+/* One block per app on the Apps page, with a line between them. */
+.app {
+	padding: 4px 0 20px;
+	border-bottom: 1px solid var(--line);
+}
+
+.app:last-of-type {
+	border-bottom: 0;
+}
+
+.app h2 {
+	margin-top: 28px;
+}
+
+.app ul {
+	margin: 0 0 14px;
+	padding-left: 20px;
+}
+
+.app li {
+	margin-bottom: 6px;
+}
+
+/* The header stays put when a link jumps to an app, so leave a little room above it. */
+.app {
+	scroll-margin-top: 12px;
 }
 
 /* Small label after a name, such as "iPhone" or "in beta". */

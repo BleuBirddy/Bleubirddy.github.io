@@ -11,9 +11,10 @@ the files on `main` as they are, so a push to `main` is a publish.
 |---|---|
 | `index.html` | Home: the tools and the apps |
 | `tools.html` | The list of tools |
+| `apps.html` | A section about each app, with links to its code |
 | `about.html` | What the site is and how it treats files |
 | `404.html` | Shown by GitHub Pages for any address that doesn't exist |
-| `styles.css` | Shared styles for the four pages above |
+| `styles.css` | Shared styles for the pages above |
 | `favicon.svg` | The tab icon |
 
 ## Tools
