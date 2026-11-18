@@ -15,6 +15,7 @@ the files on `main` as they are, so a push to `main` is a publish.
 | `about.html` | What the site is and how it treats files |
 | `404.html` | Shown by GitHub Pages for any address that doesn't exist |
 | `styles.css` | Shared styles for the pages above |
+| `logo.png` | The blue jay logo in the footer; it links to the GitHub profile |
 | `favicon.svg` | The tab icon |
 
 ## Tools

@@ -188,13 +188,26 @@ p {
 	white-space: nowrap;
 }
 
+/* Logo and credit line side by side, centered as a pair. */
 footer {
 	margin: 0;
 	padding: 14px 16px;
 	color: var(--brand);
 	background-color: var(--bar);
-	text-align: center;
 	font-size: 15px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 14px;
+}
+
+.logo {
+	display: block;
+	border-radius: 10px;
+}
+
+.logo img {
+	display: block;
 }
 
 footer a {
