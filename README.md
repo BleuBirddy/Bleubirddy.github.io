@@ -28,6 +28,10 @@ and scripts, so it works on its own.
 | `tools/comic-yassifier/` | CBZ to `.xtch` for the Xteink X3 |
 | `tools/sleep-screen-maker/` | Images to e-reader sleep screens |
 
+Each tool also has its own repo with the same files: [comic-to-epub](https://github.com/BleuBirddy/comic-to-epub),
+[comic-yassifier](https://github.com/BleuBirddy/comic-yassifier) and
+[sleep-screen-maker](https://github.com/BleuBirddy/sleep-screen-maker). A change to a tool has to be made in both places.
+
 `tools/comic_convert.py` is the command-line version of Comic to EPUB. No
 page links to it.
 
